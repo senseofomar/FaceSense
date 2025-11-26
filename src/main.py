@@ -4,9 +4,9 @@ import argparse
 import os
 import cv2
 
-from detect import load_face_detector, detect_faces, draw_boxes
-from classify import EmotionClassifier
-from utils import crop_and_preprocess, put_label
+from src.detect import load_face_detector, detect_faces, draw_boxes
+from src.classify import EmotionClassifier
+from src.utils import crop_and_preprocess, put_label
 
 def run_on_image(image_path: str):
     if not os.path.exists(image_path):
