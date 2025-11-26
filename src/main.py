@@ -4,7 +4,7 @@ import argparse
 import os
 import cv2
 
-from src.detect import load_face_detector, detect_faces, draw_boxes
+from src.expression_detector import load_face_detector, detect_faces, draw_boxes
 from src.classify import EmotionClassifier
 from src.utils import crop_and_preprocess, put_label
 
