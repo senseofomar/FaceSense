@@ -1,99 +1,59 @@
 import cv2
+import mediapipe as mp
 import numpy as np
-from cvzone.FaceMeshModule import FaceMeshDetector
-
-
-# --------------------------------------------
-# Eye Aspect Ratio (EAR)
-# --------------------------------------------
-
-def eye_aspect_ratio(eye_points):
-    """
-    Calculates eye aspect ratio from 6 landmark points (x,y).
-    EAR drops when eyes close, increases when open wide.
-    """
-    vertical1 = np.linalg.norm(eye_points[1] - eye_points[5])
-    vertical2 = np.linalg.norm(eye_points[2] - eye_points[4])
-    horizontal = np.linalg.norm(eye_points[0] - eye_points[3])
-    return (vertical1 + vertical2) / (2.0 * horizontal)
-
-
-# --------------------------------------------
-# Mouth Curvature (smile vs frown)
-# --------------------------------------------
-
-def mouth_curvature(left, right, top):
-    """
-    Positive = smile (Happy)
-    Negative = frown (Sad)
-    Near zero = Neutral
-    """
-    mid_y = (left[1] + right[1]) / 2
-    return mid_y - top[1]
-
-
-# --------------------------------------------
-# Expression Classification
-# --------------------------------------------
-
-def classify_expression(ear, curve):
-    """
-    Expression rules using EAR + Mouth curvature.
-    """
-    if curve > 6:        # Clear smile
-        return "Happy"
-    if curve < -4:       # Clear frown
-        return "Sad"
-    if ear > 0.31:       # Eyes wide open
-        return "Angry"
-    return "Neutral"
-
-
-# --------------------------------------------
-# FACE SENSE DETECTOR (for webcam or images)
-# --------------------------------------------
 
 class FaceSense:
     def __init__(self):
-        # Initialize the 468-landmark face mesh detector
-        self.detector = FaceMeshDetector(maxFaces=1)
+        self.mp_face = mp.solutions.face_mesh
+        self.face_mesh = self.mp_face.FaceMesh(refine_landmarks=True)
 
-        # Landmark indices (FaceMesh reference)
-        self.left_eye_ids = [33, 160, 158, 133, 153, 144]
-        self.right_eye_ids = [362, 385, 387, 263, 373, 380]
+    def get_expression(self, frame):
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = self.face_mesh.process(rgb)
 
-        # Mouth points (simple version)
-        self.mouth_left = 308
-        self.mouth_right = 78
-        self.mouth_top = 13
+        if not results.multi_face_landmarks:
+            return None
 
-    def detect_expression(self, img):
-        """
-        Returns (expression, img_with_landmarks)
-        """
-        img, faces = self.detector.findFaceMesh(img, draw=False)
+        landmarks = results.multi_face_landmarks[0]
+        h, w, _ = frame.shape
 
-        if not faces:
-            return "No Face", img
+        # Convert to 2D points
+        points = []
+        for lm in landmarks.landmark:
+            points.append((int(lm.x * w), int(lm.y * h)))
+        points = np.array(points)
 
-        face = faces[0]  # 468 points
+        # Eye EAR
+        left_eye = points[[33, 160, 158, 133, 153, 144]]
+        right_eye = points[[362, 385, 387, 263, 373, 380]]
 
-        # Eye landmarks
-        left_eye = np.array([face[i] for i in self.left_eye_ids])
-        right_eye = np.array([face[i] for i in self.right_eye_ids])
+        left_ear = self.eye_aspect_ratio(left_eye)
+        right_ear = self.eye_aspect_ratio(right_eye)
+        ear = (left_ear + right_ear) / 2
 
-        ear_left = eye_aspect_ratio(left_eye)
-        ear_right = eye_aspect_ratio(right_eye)
-        ear = (ear_left + ear_right) / 2
+        # Mouth curvature
+        left = points[61]   # left lip corner
+        right = points[291] # right lip corner
+        top = points[0]     # upper lip
+        curve = self.mouth_curvature(left, right, top)
 
-        # Mouth landmarks
-        left = np.array(face[self.mouth_left])
-        right = np.array(face[self.mouth_right])
-        top = np.array(face[self.mouth_top])
+        return self.classify_expression(ear, curve)
 
-        curve = mouth_curvature(left, right, top)
+    def eye_aspect_ratio(self, eye_points):
+        v1 = np.linalg.norm(eye_points[1] - eye_points[5])
+        v2 = np.linalg.norm(eye_points[2] - eye_points[4])
+        h = np.linalg.norm(eye_points[0] - eye_points[3])
+        return (v1 + v2) / (2.0 * h)
 
-        # Final classification
-        expression = classify_expression(ear, curve)
+    def mouth_curvature(self, left, right, top):
+        mid_y = (left[1] + right[1]) / 2
+        return mid_y - top[1]
 
-        return expression, img
+    def classify_expression(self, ear, curve):
+        if curve > 4:
+            return "Happy"
+        if curve < -3:
+            return "Sad"
+        if ear > 0.30:
+            return "Angry"
+        return "Neutral"
