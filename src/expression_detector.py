@@ -12,16 +12,30 @@ class FaceSense:
         results = self.face_mesh.process(rgb)
 
         if not results.multi_face_landmarks:
-            return None
+            return None, None  # <-- FIXED
 
         landmarks = results.multi_face_landmarks[0]
         h, w, _ = frame.shape
 
-        # Convert to 2D points
+        # Convert landmarks to pixel points
         points = []
+        xs = []
+        ys = []
+
         for lm in landmarks.landmark:
-            points.append((int(lm.x * w), int(lm.y * h)))
+            x = int(lm.x * w)
+            y = int(lm.y * h)
+            points.append((x, y))
+            xs.append(x)   # needed for bounding box
+            ys.append(y)   # needed for bounding box
+
         points = np.array(points)
+
+        # ---------- BOUNDING BOX FIX ----------
+        x1, y1 = min(xs), min(ys)
+        x2, y2 = max(xs), max(ys)
+        bbox = (x1, y1, x2, y2)
+        # --------------------------------------
 
         # Eye EAR
         left_eye = points[[33, 160, 158, 133, 153, 144]]
@@ -31,13 +45,15 @@ class FaceSense:
         right_ear = self.eye_aspect_ratio(right_eye)
         ear = (left_ear + right_ear) / 2
 
-        # Mouth curvature
-        left = points[61]   # left lip corner
-        right = points[291] # right lip corner
-        top = points[0]     # upper lip
+        # Mouth
+        left = points[61]
+        right = points[291]
+        top = points[0]
         curve = self.mouth_curvature(left, right, top)
 
-        return self.classify_expression(ear, curve)
+        expression = self.classify_expression(ear, curve)
+
+        return expression, bbox  # <-- FIXED RETURN TYPE
 
     def eye_aspect_ratio(self, eye_points):
         v1 = np.linalg.norm(eye_points[1] - eye_points[5])
