@@ -4,20 +4,22 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 import cv2
 from expression_detector import FaceSense
+from db import log_emotion
 
-
-def draw_results(frame, bbox, emotion_label):
+def draw_results(frame, bbox, emotion_label, confidence):
     x1, y1, x2, y2 = bbox
 
     # Draw bounding box
     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
     # Draw label background
-    cv2.rectangle(frame, (x1, y1 - 25), (x1 + 150, y1), (0, 255, 0), -1)
+    cv2.rectangle(frame, (x1, y1 - 30), (x1 + 200, y1), (0, 255, 0), -1)
 
     # Draw text
-    cv2.putText(frame, emotion_label, (x1 + 5, y1 - 7),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+    cv2.putText(frame,  f"{emotion_label} ({confidence*100:.0f}%)",
+                (x1 + 5, y1 - 7),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                (0, 0, 0), 2)
 
 
 detector = FaceSense()
@@ -28,14 +30,22 @@ while True:
     if not ret:
         break
 
-    expression, bbox = detector.get_expression(frame)
+    # Mirror view
+    frame = cv2.flip(frame, 1)
 
-    if bbox is not None:  # means face found
-        draw_results(frame, bbox, expression)
+    # Get expression + bounding-box
+    expression, confidence, bbox = detector.get_expression(frame)
+
+    if bbox is None:
+        cv2.putText(frame, "No face detected", (20, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+    else:
+        draw_results(frame, bbox, expression, confidence)
+        log_emotion(expression, confidence, bbox)
 
     cv2.imshow("FaceSense Live", frame)
 
-    if cv2.waitKey(1) & 0xFF == 27:  # ESC key to exit
+    if cv2.waitKey(1) & 0xFF == 27:  # ESC key
         break
 
 cap.release()
