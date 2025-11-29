@@ -12,7 +12,7 @@ class FaceSense:
         results = self.face_mesh.process(rgb)
 
         if not results.multi_face_landmarks:
-            return None, None  # <-- FIXED
+            return None, None, None  # <-- FIXED that confidence error
 
         landmarks = results.multi_face_landmarks[0]
         h, w, _ = frame.shape
@@ -53,7 +53,10 @@ class FaceSense:
 
         expression = self.classify_expression(ear, curve)
 
-        return expression, bbox  # <-- FIXED RETURN TYPE
+        # ---------- Confidence (simple placeholder) ----------
+        confidence = round(min(abs(curve) / 10 + abs(ear) / 0.5, 1.0), 2)
+
+        return expression, confidence, bbox  # <-- FIXED RETURN TYPE
 
     def eye_aspect_ratio(self, eye_points):
         v1 = np.linalg.norm(eye_points[1] - eye_points[5])
