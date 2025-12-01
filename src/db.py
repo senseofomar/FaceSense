@@ -10,16 +10,21 @@ def get_connection():
     )
 
 def log_emotion(expression, confidence, bbox):
-    x1, y1, x2, y2 = bbox
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
 
-    conn = get_connection()
-    cursor = conn.cursor()
+        x1, y1, x2, y2 = bbox
 
-    cursor.execute(
-        "INSERT INTO emotions (expression, confidence, x1, y1, x2, y2) VALUES (%s, %s, %s, %s, %s, %s)",
-        (expression, confidence, x1, y1, x2, y2)
-    )
+        query = """
+        INSERT INTO emotion_logs (expression, confidence, x1, y1, x2, y2)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        """
 
-    conn.commit()
-    cursor.close()
-    conn.close()
+        cursor.execute(query, (expression, confidence, x1, y1, x2, y2))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    except Exception as e:
+        print("DB ERROR:", e)
