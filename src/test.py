@@ -1,7 +1,10 @@
-
-# db test
 from db import get_connection
 
-conn = get_connection()
-print("Connected!")
-conn.close()
+print("Starting test...")
+
+try:
+    conn = get_connection()
+    print("CONNECTED SUCCESSFULLY!")
+    conn.close()
+except Exception as e:
+    print("ERROR:", e)
