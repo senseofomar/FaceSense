@@ -1,2 +1,7 @@
-import os
-print(os.path.exists("data/raw/person.png"))
+
+# db test
+from db import get_connection
+
+conn = get_connection()
+print("Connected!")
+conn.close()

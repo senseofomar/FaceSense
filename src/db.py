@@ -1,28 +1,25 @@
-# db.py
 import mysql.connector
 
 def get_connection():
     return mysql.connector.connect(
         host="localhost",
         user="root",
-        password="face",
-        database="facesense"
+        password="facesense",
+        database="facesense",
+        port=3306
     )
 
-def log_emotion(emotion, confidence, bbox):
+def log_emotion(expression, confidence, bbox):
     x1, y1, x2, y2 = bbox
 
     conn = get_connection()
     cursor = conn.cursor()
 
-    sql = """
-        INSERT INTO emotion_logs (emotion, confidence, x1, y1, x2, y2)
-        VALUES (%s, %s, %s, %s, %s, %s)
-    """
-    values = (emotion, confidence, x1, y1, x2, y2)
+    cursor.execute(
+        "INSERT INTO emotions (expression, confidence, x1, y1, x2, y2) VALUES (%s, %s, %s, %s, %s, %s)",
+        (expression, confidence, x1, y1, x2, y2)
+    )
 
-    cursor.execute(sql, values)
     conn.commit()
-
     cursor.close()
     conn.close()
