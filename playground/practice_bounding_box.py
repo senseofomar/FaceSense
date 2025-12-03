@@ -66,5 +66,13 @@ Do you see the difference?
 
 The LABEL BOX coordinates are designed by YOU to sit above the face.
 
-The FACE BOX coordinates come from Mediapipe."""
+The FACE BOX coordinates come from Mediapipe.
+
+Top-left x = x1 (align with face)
+
+Top-left y = y1 - 30 (above the face)
+
+Bottom-right x = x1 + some_width (200)
+
+Bottom-right y = y1 (touch the face)"""
 
