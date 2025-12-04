@@ -77,7 +77,8 @@ class FaceSense:
         return smooth_expression, confidence, bbox
 
 
-    def eye_aspect_ratio(self, eye_points):
+    # blink detection, drowsiness / eye-closure
+    def eye_aspect_ratio(self, eye_points): #unused right now
         v1 = np.linalg.norm(eye_points[1] - eye_points[5])
         v2 = np.linalg.norm(eye_points[2] - eye_points[4])
         h = np.linalg.norm(eye_points[0] - eye_points[3])
