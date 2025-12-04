@@ -1,3 +1,5 @@
+from collections import deque
+
 import cv2
 import mediapipe as mp
 import numpy as np
@@ -6,6 +8,9 @@ class FaceSense:
     def __init__(self):
         self.mp_face = mp.solutions.face_mesh
         self.face_mesh = self.mp_face.FaceMesh(refine_landmarks=True)
+
+        # smoothing to prevent flickering
+        self.history = deque(maxlen=5)
 
     def get_expression(self, frame):
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
