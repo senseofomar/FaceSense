@@ -1,5 +1,8 @@
 import cv2
 
+from src.expression_detector import FaceSense
+from src.facesense_live import confidence
+
 
 def draw_results(frame, bbox, label, confidence):
     x1,y1,x2,y2 = bbox
@@ -11,7 +14,7 @@ def draw_results(frame, bbox, label, confidence):
     cv2.putText(frame, f"({label},{confidence}",
                 x1-5, y1+7,
                 cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.7,
-                color =(0,255,0), thickness=2
+                color =(0,255,0), thickness=2)
 
     return frame
 
@@ -75,4 +78,15 @@ Top-left y = y1 - 30 (above the face)
 Bottom-right x = x1 + some_width (200)
 
 Bottom-right y = y1 (touch the face)"""
+
+detector = FaceSense()
+cap = cv2.VideoCapture(0)
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    frame = cv2.flip(frame, 1)
+
+    expression, confidence,bbox = detector.get_expression(frame)
 
