@@ -47,7 +47,7 @@ class FaceSense:
         lip_gap = lower_lip[1] - upper_lip[1]
 
         # Mouth curve: positive = smile, negative = sad
-        curve = ((left_mouth[1] + right_mouth[1]) / 2) - upper_lip[1]
+        curve = self.mouth_curvature(left_mouth, right_mouth, upper_lip)
 
         # Eyebrow height (lower = angry)
         brow_drop = ((left_brow[1] + right_brow[1]) / 2) - upper_lip[1]
@@ -88,11 +88,4 @@ class FaceSense:
         mid_y = (left[1] + right[1]) / 2
         return mid_y - top[1]
 
-    def classify_expression(self, ear, curve):
-        if curve > 4:
-            return "Happy"
-        if curve < -3:
-            return "Sad"
-        if ear > 0.30:
-            return "Angry"
-        return "Neutral"
+
