@@ -23,24 +23,42 @@ class FaceSense:
         h, w, _ = frame.shape
 
         # Convert landmarks to pixel points
-        points = []
-        xs = []
-        ys = []
+        # Convert landmarks to array
+        points = np.array([(int(lm.x * w), int(lm.y * h)) for lm in landmarks.landmark])
 
-        for lm in landmarks.landmark:
-            x = int(lm.x * w)
-            y = int(lm.y * h)
-            points.append((x, y))
-            xs.append(x)   # needed for bounding box
-            ys.append(y)   # needed for bounding box
+        # Bounding box
+        xs = points[:, 0]
+        ys = points[:, 1]
+        bbox = (min(xs), min(ys), max(xs), max(ys))
 
-        points = np.array(points)
+        # ---------- EXTRACT IMPORTANT LANDMARKS ----------
+        left_mouth = points[61]
+        right_mouth = points[291]
+        upper_lip = points[13]
+        lower_lip = points[14]
 
-        # ---------- BOUNDING BOX FIX ----------
-        x1, y1 = min(xs), min(ys)
-        x2, y2 = max(xs), max(ys)
-        bbox = (x1, y1, x2, y2)
-        # --------------------------------------
+        left_brow = points[70]
+        right_brow = points[300]
+
+        # ---------- COMPUTE FEATURES ----------
+
+        # Smile width (bigger = smile)
+        mouth_width = np.linalg.norm(left_mouth - right_mouth)
+
+        # Lip openness (bigger = smile)
+        lip_gap = lower_lip[1] - upper_lip[1]
+
+        # Mouth curve: positive = smile, negative = sad
+        curve = ((left_mouth[1] + right_mouth[1]) / 2) - upper_lip[1]
+
+        # Eyebrow height (lower = angry)
+        brow_drop = ((left_brow[1] + right_brow[1]) / 2) - upper_lip[1]
+
+        # ---------- SCORE SYSTEM ----------
+        happy_score = (mouth_width * 0.02) + (lip_gap * 0.04) + (curve * 0.3)
+        sad_score = (-curve * 0.4)
+        angry_score = (-brow_drop * 0.4)
+
 
         # Eye EAR
         left_eye = points[[33, 160, 158, 133, 153, 144]]
