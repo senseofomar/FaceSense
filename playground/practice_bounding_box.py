@@ -1,5 +1,6 @@
 import cv2
 
+from src.db import log_emotion
 from src.expression_detector import FaceSense
 from src.facesense_live import confidence
 
@@ -90,3 +91,16 @@ while True:
 
     expression, confidence,bbox = detector.get_expression(frame)
 
+    if bbox is None:
+        cv2.putText(frame, "NO FACE DETECTED", (20,40),
+                    cv2.FONT_HERSHEY_SIMPLEX, 2, (0,255,0), 3   )
+    else:
+        draw_results(frame, bbox, expression, confidence)
+        log_emotion(expression, confidence, bbox)
+
+    cv2.imshow("FaceSense Live", frame )
+    if cv2.waitKey(1) &0xFF ==27:
+        break
+
+cap.release()
+cv2.destroyAllWindows()
