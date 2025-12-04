@@ -1,8 +1,7 @@
-from collections import deque
-
 import cv2
 import mediapipe as mp
 import numpy as np
+from collections import deque
 
 class FaceSense:
     def __init__(self):
@@ -17,12 +16,11 @@ class FaceSense:
         results = self.face_mesh.process(rgb)
 
         if not results.multi_face_landmarks:
-            return None, None, None  # <-- FIXED that confidence error
+            return None, None, None
 
         landmarks = results.multi_face_landmarks[0]
         h, w, _ = frame.shape
 
-        # Convert landmarks to pixel points
         # Convert landmarks to array
         points = np.array([(int(lm.x * w), int(lm.y * h)) for lm in landmarks.landmark])
 
@@ -59,27 +57,25 @@ class FaceSense:
         sad_score = (-curve * 0.4)
         angry_score = (-brow_drop * 0.4)
 
+        # Normalize scores to positive only
+        scores = {
+            "Happy": max(happy_score, 0),
+            "Sad": max(sad_score, 0),
+            "Angry": max(angry_score, 0),
+            "Neutral": 0.3  # baseline
+        }
 
-        # Eye EAR
-        left_eye = points[[33, 160, 158, 133, 153, 144]]
-        right_eye = points[[362, 385, 387, 263, 373, 380]]
+        # Best expression
+        expression = max(scores, key=scores.get)
+        confidence = min(scores[expression] / 5, 1.0)
+        confidence = round(confidence, 2)
 
-        left_ear = self.eye_aspect_ratio(left_eye)
-        right_ear = self.eye_aspect_ratio(right_eye)
-        ear = (left_ear + right_ear) / 2
+        # Smooth prediction
+        self.history.append(expression)
+        smooth_expression = max(set(self.history), key=self.history.count)
 
-        # Mouth
-        left = points[61]
-        right = points[291]
-        top = points[0]
-        curve = self.mouth_curvature(left, right, top)
+        return smooth_expression, confidence, bbox
 
-        expression = self.classify_expression(ear, curve)
-
-        # ---------- Confidence (simple placeholder) ----------
-        confidence = round(min(abs(curve) / 10 + abs(ear) / 0.5, 1.0), 2)
-
-        return expression, confidence, bbox  # <-- FIXED RETURN TYPE
 
     def eye_aspect_ratio(self, eye_points):
         v1 = np.linalg.norm(eye_points[1] - eye_points[5])
