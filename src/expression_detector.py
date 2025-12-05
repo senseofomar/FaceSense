@@ -13,6 +13,9 @@ class FaceSense:
 
     def get_expression(self, frame):
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        # self.face_mesh.process(rgb) → runs Mediapipe FaceMesh model
+        # results.multi_face_landmarks → list of all detected faces
         results = self.face_mesh.process(rgb)
 
         if not results.multi_face_landmarks:
