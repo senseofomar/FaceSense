@@ -21,32 +21,35 @@ def draw_results(frame, bbox, emotion_label, confidence):
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7,
                 (0, 0, 0), 2)
 
+def main():
+    detector = FaceSense()
+    cap = cv2.VideoCapture(0)
 
-detector = FaceSense()
-cap = cv2.VideoCapture(0)
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        break
+        # Mirror view
+        frame = cv2.flip(frame, 1)
 
-    # Mirror view
-    frame = cv2.flip(frame, 1)
+        # Get expression + bounding-box
+        expression, confidence, bbox = detector.get_expression(frame)
 
-    # Get expression + bounding-box
-    expression, confidence, bbox = detector.get_expression(frame)
+        if bbox is None:
+            cv2.putText(frame, "No face detected", (20, 40),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        else:
+            draw_results(frame, bbox, expression, confidence)
+            log_emotion(expression, confidence, bbox)
 
-    if bbox is None:
-        cv2.putText(frame, "No face detected", (20, 40),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-    else:
-        draw_results(frame, bbox, expression, confidence)
-        log_emotion(expression, confidence, bbox)
+        cv2.imshow("FaceSense Live", frame)
 
-    cv2.imshow("FaceSense Live", frame)
+        if cv2.waitKey(1) & 0xFF == 27:  # ESC key
+            break
 
-    if cv2.waitKey(1) & 0xFF == 27:  # ESC key
-        break
+    cap.release()
+    cv2.destroyAllWindows()
 
-cap.release()
-cv2.destroyAllWindows()
+if __name__ =="__main__":
+    main()
