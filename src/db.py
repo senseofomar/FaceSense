@@ -25,7 +25,7 @@ def log_emotion(expression, confidence, bbox):
         confidence = float(confidence)
 
         query = """
-        INSERT INTO emotion_logs (expression, confidence, x1, y1, x2, y2)
+        INSERT INTO facesense (expression, confidence, x1, y1, x2, y2)
         VALUES (%s, %s, %s, %s, %s, %s)
         """
 

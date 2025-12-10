@@ -3,6 +3,7 @@ import mediapipe as mp
 import numpy as np
 from collections import deque
 
+
 class FaceSense:
     def __init__(self):
         self.mp_face = mp.solutions.face_mesh
@@ -81,7 +82,11 @@ class FaceSense:
         # ---------- SCORE SYSTEM ----------
         happy_score = 3.0 * mouth_width_n + 2.5 * lip_gap_n + 5.0 * curve_up
         sad_score = 4.0 * curve_down  # mouth pulled down
-        angry_score = 1.5 * curve_down  # also lower mouth / tension, but weaker
+        angry_score = 2.0 * curve_down  # also lower mouth / tension, but weaker
+
+        # Hard guard: if mouth isn't really "smiley", kill happy_score
+        if lip_gap_n < 0.01 and curve_up < 0.01:
+            happy_score = 0.0
 
         # Normalize scores to positive only
         scores = {
@@ -91,24 +96,26 @@ class FaceSense:
             "Neutral": 0.3  # baseline
         }
 
+        # computing confidence
         best_label = max(scores, key=scores.get)
         best_score = scores[best_label]
         total = sum(scores.values()) + 1e-6
+
+        if best_score < 0.15:
+            expression = "Neutral"
+        else :
+            expression = best_label
+
         confidence = best_score / total  # like softmax-ish normalisation
         confidence = float(round(min(max(confidence, 0.0), 1.0), 2))
-
-        # Best expression
-        expression = max(scores, key=scores.get)
-        confidence = min(scores[expression] / 5, 1.0)
-        confidence = round(confidence, 2)
 
         # Smooth prediction
         self.history.append(expression)
         smooth_expression = max(set(self.history), key=self.history.count)
 
-        # Reducing the prints on every call from 30 fps to 3 fps
+        # Reducing the prints on every call from 30 fps to 2 fps
         self.debug_counter += 1
-        if self.debug_counter % 10 ==0:
+        if self.debug_counter % 15 ==0:
         #debugging test 2 - raw feature values
             print(f"mouth_width={mouth_width:.1f}, lip_gap={lip_gap:.1f}, curve={curve:.2f}, brow={brow:.1f}")
 
