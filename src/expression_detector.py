@@ -81,7 +81,7 @@ class FaceSense:
 
         # ---------- SCORE SYSTEM ----------
         happy_score = 2.0 * mouth_width_n + 3.0 * lip_gap_n + 2.0 * curve_up
-        sad_score = 9.0 * curve_down  # mouth pulled down
+        sad_score = 8.0 * curve_down  # mouth pulled down
         angry_score = 7.0 * curve_down  # also lower mouth / tension, but weaker
 
         # Hard guard: if mouth isn't really "smiley", kill happy_score
