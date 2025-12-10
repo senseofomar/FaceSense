@@ -7,7 +7,7 @@ class FaceSense:
     def __init__(self):
         self.mp_face = mp.solutions.face_mesh
         self.face_mesh = self.mp_face.FaceMesh(refine_landmarks=True)
-
+        self.debug_counter = 0
         # smoothing to prevent flickering
         self.history = deque(maxlen=5)
 
@@ -27,10 +27,20 @@ class FaceSense:
         # Convert landmarks to array
         points = np.array([(int(lm.x * w), int(lm.y * h)) for lm in landmarks.landmark])
 
-        # Bounding box
+        # debugging test 1 - checking the landmark points
+        for i, (x, y) in enumerate(points):
+            cv2.circle(frame, (x, y), 2, (255, 0, 0), -1)
+            if i in (61, 291, 13, 14, 70, 300):
+                cv2.putText(frame, str(i), (x + 3, y + 3), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 255, 255), 1)
+
+        # Bounding box, fix - normalized the face size
         xs = points[:, 0]
         ys = points[:, 1]
-        bbox = (min(xs), min(ys), max(xs), max(ys))
+        x1, y1, x2, y2 = min(xs), min(ys), max(xs), max(ys)
+        bbox = (x1, y1, x2, y2)
+
+        face_w = max(1, x2 - x1)  # avoid division by zero
+        face_h = max(1, y2 - y1)
 
         # ---------- EXTRACT IMPORTANT LANDMARKS ----------
         left_mouth = points[61]
@@ -53,12 +63,25 @@ class FaceSense:
         curve = self.mouth_curvature(left_mouth, right_mouth, upper_lip)
 
         # Eyebrow height (lower = angry)
-        brow_drop = ((left_brow[1] + right_brow[1]) / 2) - upper_lip[1]
+        brow = ((left_brow[1] + right_brow[1]) / 2) - upper_lip[1]
+
+        # normalize by face size
+        mouth_width_n = mouth_width / face_w
+        lip_gap_n = lip_gap / face_h
+        curve_n = curve / face_h
+        brow_n = brow / face_h
+
+        mouth_width_n = max(0.0, mouth_width_n)
+        lip_gap_n = max(0.0, lip_gap_n)
+
+        # Separate positive / negative curvature
+        curve_up = max(0.0, curve_n)  # smile
+        curve_down = max(0.0, -curve_n)  # frown
 
         # ---------- SCORE SYSTEM ----------
-        happy_score = (mouth_width * 0.02) + (lip_gap * 0.04) + (curve * 0.3)
-        sad_score = (-curve * 0.4)
-        angry_score = (-brow_drop * 0.4)
+        happy_score = 3.0 * mouth_width_n + 2.5 * lip_gap_n + 5.0 * curve_up
+        sad_score = 4.0 * curve_down  # mouth pulled down
+        angry_score = 1.5 * curve_down  # also lower mouth / tension, but weaker
 
         # Normalize scores to positive only
         scores = {
@@ -68,6 +91,12 @@ class FaceSense:
             "Neutral": 0.3  # baseline
         }
 
+        best_label = max(scores, key=scores.get)
+        best_score = scores[best_label]
+        total = sum(scores.values()) + 1e-6
+        confidence = best_score / total  # like softmax-ish normalisation
+        confidence = float(round(min(max(confidence, 0.0), 1.0), 2))
+
         # Best expression
         expression = max(scores, key=scores.get)
         confidence = min(scores[expression] / 5, 1.0)
@@ -76,6 +105,12 @@ class FaceSense:
         # Smooth prediction
         self.history.append(expression)
         smooth_expression = max(set(self.history), key=self.history.count)
+
+        # Reducing the prints on every call from 30 fps to 3 fps
+        self.debug_counter += 1
+        if self.debug_counter % 10 ==0:
+        #debugging test 2 - raw feature values
+            print(f"mouth_width={mouth_width:.1f}, lip_gap={lip_gap:.1f}, curve={curve:.2f}, brow={brow:.1f}")
 
         return smooth_expression, confidence, bbox
 
