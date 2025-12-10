@@ -80,9 +80,9 @@ class FaceSense:
         curve_down = max(0.0, -curve_n)  # frown
 
         # ---------- SCORE SYSTEM ----------
-        happy_score = 3.0 * mouth_width_n + 2.5 * lip_gap_n + 5.0 * curve_up
-        sad_score = 4.0 * curve_down  # mouth pulled down
-        angry_score = 2.0 * curve_down  # also lower mouth / tension, but weaker
+        happy_score = 2.0 * mouth_width_n + 3.0 * lip_gap_n + 2.0 * curve_up
+        sad_score = 9.0 * curve_down  # mouth pulled down
+        angry_score = 7.0 * curve_down  # also lower mouth / tension, but weaker
 
         # Hard guard: if mouth isn't really "smiley", kill happy_score
         if lip_gap_n < 0.01 and curve_up < 0.01:
@@ -101,7 +101,7 @@ class FaceSense:
         best_score = scores[best_label]
         total = sum(scores.values()) + 1e-6
 
-        if best_score < 0.15:
+        if best_score < 0.07:
             expression = "Neutral"
         else :
             expression = best_label
