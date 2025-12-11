@@ -29,10 +29,10 @@ class FaceSense:
         points = np.array([(int(lm.x * w), int(lm.y * h)) for lm in landmarks.landmark])
 
         # debugging test 1 - checking the landmark points
-        for i, (x, y) in enumerate(points):
-            cv2.circle(frame, (x, y), 2, (255, 0, 0), -1)
-            if i in (61, 291, 13, 14, 70, 300):
-                cv2.putText(frame, str(i), (x + 3, y + 3), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 255, 255), 1)
+        # for i, (x, y) in enumerate(points):
+        #     cv2.circle(frame, (x, y), 2, (255, 0, 0), -1)
+        #     if i in (61, 291, 13, 14, 70, 300):
+        #         cv2.putText(frame, str(i), (x + 3, y + 3), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 255, 255), 1)
 
         # Bounding box, fix - normalized the face size
         xs = points[:, 0]
@@ -113,11 +113,11 @@ class FaceSense:
         self.history.append(expression)
         smooth_expression = max(set(self.history), key=self.history.count)
 
-        # Reducing the prints on every call from 30 fps to 2 fps
-        self.debug_counter += 1
-        if self.debug_counter % 15 ==0:
-        #debugging test 2 - raw feature values
-            print(f"mouth_width={mouth_width:.1f}, lip_gap={lip_gap:.1f}, curve={curve:.2f}, brow={brow:.1f}")
+        # debugging test 2 - raw feature values, Reducing the prints on every call from 30 fps to 2 fps
+        # self.debug_counter += 1
+        # if self.debug_counter % 15 ==0:
+        #
+        #     print(f"mouth_width={mouth_width:.1f}, lip_gap={lip_gap:.1f}, curve={curve:.2f}, brow={brow:.1f}")
 
         return smooth_expression, confidence, bbox
 

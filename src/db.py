@@ -9,7 +9,7 @@ def get_connection():
         port=3306
     )
 
-def log_emotion(expression, confidence, bbox):
+def log_emotion(expression, confidence, bbox, session_id = None):
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -25,11 +25,13 @@ def log_emotion(expression, confidence, bbox):
         confidence = float(confidence)
 
         query = """
-        INSERT INTO emotions (expression, confidence, x1, y1, x2, y2)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        INSERT INTO emotion_logs (expression, confidence, 
+                                  x1, y1, x2, y2, session_id)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
 
-        cursor.execute(query, (expression, confidence, x1, y1, x2, y2))
+        cursor.execute(query, (expression, confidence,
+                               x1, y1, x2, y2, session_id))
         conn.commit()
         cursor.close()
         conn.close()
