@@ -1,3 +1,4 @@
+mysql-connector-python
 pandas
 streamlit
 mediapipe
