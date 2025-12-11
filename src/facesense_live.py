@@ -5,6 +5,10 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import cv2
 from expression_detector import FaceSense
 from db import log_emotion
+import time
+from utils.io_utils import save_snapshot
+
+SESSION_ID = int(time.time())
 
 def draw_results(frame, bbox, emotion_label, confidence):
     x1, y1, x2, y2 = bbox
@@ -24,6 +28,7 @@ def draw_results(frame, bbox, emotion_label, confidence):
 def main():
     detector = FaceSense()
     cap = cv2.VideoCapture(0)
+    last_expression = None
 
     while True:
         ret, frame = cap.read()
@@ -41,6 +46,13 @@ def main():
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         else:
             draw_results(frame, bbox, expression, confidence)
+            # Save last snapshot for dashboard
+            save_snapshot(frame, tag ="last")
+            # Optionally also save timestamped snapshot on expression change
+            if expression != last_expression:
+                save_snapshot(frame, tag=f"{expression}")
+                last_expression = expression
+
             log_emotion(expression, confidence, bbox)
 
         cv2.imshow("FaceSense Live", frame)
