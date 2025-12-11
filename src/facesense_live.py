@@ -7,8 +7,12 @@ from expression_detector import FaceSense
 from db import log_emotion
 import time
 from utils.io_utils import save_snapshot
+import warnings
+# Optional: suppress mediapipe/protobuf deprecation warning (harmless)
+warnings.filterwarnings("ignore", message="SymbolDatabase.GetPrototype")
 
 SESSION_ID = int(time.time())
+LAST_EXPRESSION = None
 
 def draw_results(frame, bbox, emotion_label, confidence):
     x1, y1, x2, y2 = bbox
@@ -25,43 +29,61 @@ def draw_results(frame, bbox, emotion_label, confidence):
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7,
                 (0, 0, 0), 2)
 
+# at top of facesense_live.py (near other imports)
+
+
 def main():
-    detector = FaceSense()
+    # initialize webcam, detector, etc. (your existing setup)
     cap = cv2.VideoCapture(0)
+    detector = FaceSense()
+
+    # Initialize last expression variable INSIDE main (safe scope)
     last_expression = None
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
 
-        # Mirror view
-        frame = cv2.flip(frame, 1)
+            frame = cv2.flip(frame, 1)
+            expression, confidence, bbox = detector.get_expression(frame)
 
-        # Get expression + bounding-box
-        expression, confidence, bbox = detector.get_expression(frame)
+            # draw + show - your existing drawing code here
+            if bbox is not None:
+                x1, y1, x2, y2 = bbox
+                draw_results(frame, bbox, expression, confidence)
 
-        if bbox is None:
-            cv2.putText(frame, "No face detected", (20, 40),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-        else:
-            draw_results(frame, bbox, expression, confidence)
-            # Save last snapshot for dashboard
-            save_snapshot(frame, tag ="last")
-            # Optionally also save timestamped snapshot on expression change
-            if expression != last_expression:
-                save_snapshot(frame, tag=f"{expression}")
-                last_expression = expression
+                # Save the last snapshot (overwrites)
+                try:
+                    saved = save_snapshot(frame, tag="last")
+                    print("Saved snapshot:", saved)
+                except Exception as e:
+                    print("Snapshot save error:", e)
 
-            log_emotion(expression, confidence, bbox)
+                # Save a timestamped snapshot only when expression changes
+                try:
+                    if expression != last_expression:
+                        saved_event = save_snapshot(frame, tag=expression)
+                        print("Saved event snapshot:", saved_event)
+                        last_expression = expression  # update the variable AFTER saving
+                except Exception as e:
+                    print("Event snapshot error:", e)
 
-        cv2.imshow("FaceSense Live", frame)
+                # log to DB (ensure log_emotion handles casting)
+                try:
+                    log_emotion(expression, confidence, bbox, session_id=SESSION_ID)
+                except Exception as e:
+                    print("DB logging error:", e)
 
-        if cv2.waitKey(1) & 0xFF == 27:  # ESC key
-            break
+            # show frame
+            cv2.imshow("FaceSense Live", frame)
+            if cv2.waitKey(1) & 0xFF == 27:
+                break
 
-    cap.release()
-    cv2.destroyAllWindows()
+    finally:
+        cap.release()
+        cv2.destroyAllWindows()
 
 if __name__ =="__main__":
     main()

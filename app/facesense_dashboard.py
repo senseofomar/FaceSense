@@ -1,4 +1,4 @@
-# apps/facesense_dashboard.py  (patched)
+# apps/facesense_dashboard.py
 import streamlit as st
 import pandas as pd
 import time
@@ -9,10 +9,8 @@ import mysql.connector
 
 st.set_page_config(page_title="FaceSense Dashboard", layout="wide")
 
-SNAPSHOT_PATH = os.path.join("snapshots", "last_frame.jpg")
+SNAPSHOT_PATH = os.path.join(os.getcwd(), "snapshots", "last_frame.jpg")
 
-
-# ---------- DB helper (reuse your db.get_connection if you want) ----------
 def get_conn():
     return mysql.connector.connect(
         host="localhost",
@@ -22,14 +20,10 @@ def get_conn():
         port=3306
     )
 
-
-# ---------- Snapshot loader with explicit debug info ----------
 @st.cache_data(ttl=5)
 def load_last_snapshot(path=SNAPSHOT_PATH):
-    # show absolute path for easier debugging
     abs_path = os.path.abspath(path)
     if not os.path.exists(path):
-        # return None but also show helpful info to the user
         st.session_state.setdefault("_snapshot_debug", f"No snapshot found at: {abs_path}")
         return None
     img = cv2.imread(path)
@@ -40,75 +34,68 @@ def load_last_snapshot(path=SNAPSHOT_PATH):
     st.session_state.pop("_snapshot_debug", None)
     return img
 
-
-# ---------- Load recent logs from DB ----------
 @st.cache_data(ttl=5)
 def load_logs(limit=200):
     try:
         conn = get_conn()
         cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT id, ts, expression, confidence, x1, y1, x2, y2 FROM emotions ORDER BY ts DESC LIMIT %s", (limit,))
+
+        # Try to select using 'ts' column; fallback gracefully if ts doesn't exist.
+        try:
+            cur.execute("SELECT id, ts, expression, confidence, x1, y1, x2, y2 FROM emotion_logs ORDER BY ts DESC LIMIT %s", (limit,))
+        except mysql.connector.errors.ProgrammingError:
+            # fallback: select without ts (try to infer a time-like column)
+            cur.execute("SELECT id, expression, confidence, x1, y1, x2, y2 FROM emotion_logs ORDER BY id DESC LIMIT %s", (limit,))
+
         rows = cur.fetchall()
         cur.close()
         conn.close()
-        return pd.DataFrame(rows)
+        df = pd.DataFrame(rows)
+        # If ts not present but id exists, create fake ts from id order (not ideal but avoids crashes)
+        if 'ts' not in df.columns and not df.empty:
+            df['ts'] = pd.Timestamp.now()
+        return df
     except Exception as e:
-        # surface DB errors in UI
         st.session_state.setdefault("_db_error", str(e))
         return pd.DataFrame()
-
 
 def counts_by_label(df):
     if df.empty:
         return pd.DataFrame()
     return df['expression'].value_counts().rename_axis('expression').reset_index(name='count')
 
-
-# ---------- Robust force-rerun (works across versions) ----------
 def force_rerun():
-    # Try the direct rerun if available
     try:
         st.experimental_rerun()
         return
     except Exception:
         pass
-
-    # If experimental_rerun isn't available, try query params (some versions)
     try:
-        # read-only view of query params
         current = dict(st.query_params)
         current["_refresh_ts"] = int(time.time())
-        # some streamlit versions still provide experimental_set_query_params
         try:
             st.experimental_set_query_params(**current)
             return
         except Exception:
-            # fallback: modify a session_state key to trigger rerun
             st.session_state["_force_rerun_key"] = int(time.time())
             return
     except Exception:
-        # final fallback: toggle a session_state key
         st.session_state["_force_rerun_key"] = int(time.time())
         return
 
-
-# ---------- Layout ----------
 st.title("FaceSense — Live Dashboard")
 col1, col2 = st.columns([1, 1.2])
 
 with col1:
     st.header("Live Snapshot")
-    # show debug message if snapshot missing
     img = load_last_snapshot()
     if img is not None:
         st.image(img, use_column_width=True)
     else:
-        # show helpful info saved by loader
         msg = st.session_state.get("_snapshot_debug", "No snapshot found. Run FaceSense to create snapshots.")
         st.info(msg)
 
     if st.button("Refresh now"):
-        # clear cached data and force rerun
         try:
             st.cache_data.clear()
         except Exception:
@@ -117,7 +104,6 @@ with col1:
 
 with col2:
     st.header("Recent Predictions")
-    # surface DB errors if any
     db_err = st.session_state.get("_db_error")
     if db_err:
         st.error(f"DB error: {db_err}")
@@ -129,10 +115,12 @@ with col2:
         counts = counts_by_label(df)
         if not counts.empty:
             st.bar_chart(data=counts.set_index('expression'))
-        # timeline: group by minute
-        df['ts'] = pd.to_datetime(df['ts'])
-        df2 = df.set_index('ts').resample('1Min').size().rename('predictions').reset_index()
-        st.line_chart(df2.set_index('ts')['predictions'])
+        try:
+            df['ts'] = pd.to_datetime(df['ts'])
+            df2 = df.set_index('ts').resample('1Min').size().rename('predictions').reset_index()
+            st.line_chart(df2.set_index('ts')['predictions'])
+        except Exception:
+            st.info("Unable to create timeline (missing/invalid ts column).")
     else:
         st.info("No logs to show. Ensure DB and FaceSense are running.")
 
