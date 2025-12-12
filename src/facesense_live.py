@@ -13,28 +13,13 @@ from expression_detector import FaceSense
 from db import log_emotion
 import time
 from utils.io_utils import save_snapshot
+from utils.append_features_csv import append_features_csv
+from utils.draw_results import draw_results
 import warnings
 # Optional: suppress mediapipe/protobuf deprecation warning (harmless)
 warnings.filterwarnings("ignore", message="SymbolDatabase.GetPrototype")
 
 SESSION_ID = int(time.time())
-
-def draw_results(frame, bbox, emotion_label, confidence):
-    x1, y1, x2, y2 = bbox
-
-    # Draw bounding box
-    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-
-    # Draw label background
-    cv2.rectangle(frame, (x1, y1 - 30), (x1 + 200, y1), (0, 255, 0), -1)
-
-    # Draw text
-    cv2.putText(frame,  f"{emotion_label} ({confidence*100:.0f}%)",
-                (x1 + 5, y1 - 7),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                (0, 0, 0), 2)
-
-# at top of facesense_live.py (near other imports)
 
 
 def main():
@@ -74,6 +59,25 @@ def main():
                         last_expression = expression  # update the variable AFTER saving
                 except Exception as e:
                     print("Event snapshot error:", e)
+
+                # --- LOG RAW FEATURES TO CSV (Task 2) ---
+                try:
+                    mw = detector.last_mouth_width
+                    lg = detector.last_lip_gap
+                    cv = detector.last_curve
+                    br = detector.last_brow
+
+                    row = [
+                        time.time(),
+                        expression,
+                        confidence,
+                        mw, lg, cv, br,
+                        x1, y1, x2, y2
+                    ]
+
+                    append_features_csv(row)
+                except Exception as e:
+                    print("CSV logging error:", e)
 
                 # log to DB (ensure log_emotion handles casting)
                 try:

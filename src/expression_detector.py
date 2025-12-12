@@ -3,6 +3,8 @@ import mediapipe as mp
 import numpy as np
 from collections import deque
 
+from utils.draw_debug_features import draw_debug_features
+
 
 class FaceSense:
     def __init__(self):
@@ -11,6 +13,12 @@ class FaceSense:
         self.debug_counter = 0
         # smoothing to prevent flickering
         self.history = deque(maxlen=5)
+
+        # Declare feature placeholders
+        self.last_mouth_width = 0.0
+        self.last_lip_gap = 0.0
+        self.last_curve = 0.0
+        self.last_brow = 0.0
 
     def get_expression(self, frame):
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -79,6 +87,9 @@ class FaceSense:
         curve_up = max(0.0, curve_n)  # smile
         curve_down = max(0.0, -curve_n)  # frown
 
+        # raw feature overlay on live frames
+        draw_debug_features(frame, mouth_width, lip_gap, curve, brow)
+
         # ---------- SCORE SYSTEM ----------
         happy_score = 2.0 * mouth_width_n + 3.0 * lip_gap_n + 2.0 * curve_up
         sad_score = 8.0 * curve_down  # mouth pulled down
@@ -118,6 +129,17 @@ class FaceSense:
         # if self.debug_counter % 15 ==0:
         #
         #     print(f"mouth_width={mouth_width:.1f}, lip_gap={lip_gap:.1f}, curve={curve:.2f}, brow={brow:.1f}")
+
+        """
+        object oriented pattern:
+        “Compute inside the model 
+        → expose attributes 
+        → read outside the model"
+        """
+        self.last_mouth_width = mouth_width
+        self.last_lip_gap = lip_gap
+        self.last_curve = curve
+        self.last_brow = brow
 
         return smooth_expression, confidence, bbox
 
