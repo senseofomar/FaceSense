@@ -90,7 +90,7 @@ with col1:
     st.header("Live Snapshot")
     img = load_last_snapshot()
     if img is not None:
-        st.image(img, use_column_width=True)
+        st.image(img, width=700)
     else:
         msg = st.session_state.get("_snapshot_debug", "No snapshot found. Run FaceSense to create snapshots.")
         st.info(msg)

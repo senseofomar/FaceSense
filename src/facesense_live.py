@@ -12,7 +12,6 @@ import warnings
 warnings.filterwarnings("ignore", message="SymbolDatabase.GetPrototype")
 
 SESSION_ID = int(time.time())
-LAST_EXPRESSION = None
 
 def draw_results(frame, bbox, emotion_label, confidence):
     x1, y1, x2, y2 = bbox

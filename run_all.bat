@@ -1,31 +1,33 @@
 @echo off
-REM run_all.bat — Start FaceSense live and Streamlit dashboard in two windows
-REM Must be located in project root (the folder that contains .venv, src, app, utils)
+REM Robust run_all.bat for Windows — put this in project root
 
-REM Save the script directory (project root)
-SET ROOT=%~dp0
-REM Remove trailing backslash for nicer printing
-IF "%ROOT:~-1%"=="\" SET ROOT=%ROOT:~0,-1%
-
-echo Project root: %ROOT%
-cd /d "%ROOT%"
-
-REM Check venv exist
-IF NOT EXIST ".venv\Scripts\activate" (
-  echo Virtualenv not found at .venv\Scripts\activate
-  echo Please create or point run_all.bat to your venv.
+REM Move to the folder where this script lives (project root)
+pushd "%~dp0" || (
+  echo Failed to change directory to "%~dp0"
   pause
   exit /b 1
 )
 
-REM -- Start FaceSense Live in a new window --
-start "FaceSense Live" cmd /k "cd /d \"%ROOT%\" && .venv\Scripts\activate && echo Running FaceSense Live... && python -u src\facesense_live.py"
+REM Check venv activation script exists
+IF NOT EXIST ".venv\Scripts\activate" (
+  echo Virtualenv activation not found at .venv\Scripts\activate
+  echo Please create or point run_all.bat to your venv.
+  popd
+  pause
+  exit /b 1
+)
 
-REM short pause so live starts first (optional)
+echo Project root: %CD%
+echo Starting FaceSense Live and Streamlit Dashboard...
+
+REM Start FaceSense Live in a new window (no extra cd inside start)
+start "FaceSense Live" cmd /k ".venv\Scripts\activate && echo Running FaceSense Live... && python -u src\facesense_live.py"
+
+REM short delay so the camera process starts first
 timeout /t 1 /nobreak >nul
 
-REM -- Start Streamlit Dashboard in a new window --
-start "FaceSense Dashboard" cmd /k "cd /d \"%ROOT%\" && .venv\Scripts\activate && echo Running Streamlit Dashboard... && streamlit run app\facesense_dashboard.py"
+REM Start Streamlit Dashboard in a new window
+start "FaceSense Dashboard" cmd /k ".venv\Scripts\activate && echo Running Streamlit Dashboard... && streamlit run app\facesense_dashboard.py"
 
-echo Launched FaceSense Live and Streamlit. Check the two windows.
+popd
 exit /b 0
