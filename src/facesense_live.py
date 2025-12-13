@@ -91,8 +91,18 @@ def main():
 
             # show frame
             cv2.imshow("FaceSense Live", frame)
-            if cv2.waitKey(1) & 0xFF == 27:
+            key = cv2.waitKey(1) & 0xFF
+
+            # press ESC to quit
+            if key == 27:
                 break
+
+            # press 'd' to toggle debug mode
+            if key == ord('d'):
+                new = not detector.debug
+                detector.set_debug(new)
+                print(f"Debug mode set to: {detector.debug}")
+
 
     finally:
         cap.release()
