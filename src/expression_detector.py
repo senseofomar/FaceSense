@@ -4,6 +4,7 @@ import numpy as np
 from collections import deque
 
 from utils.draw_debug_features import draw_debug_features
+from utils.draw_feature_bars import draw_feature_bars
 
 
 class FaceSense:
@@ -19,6 +20,13 @@ class FaceSense:
         self.last_lip_gap = 0.0
         self.last_curve = 0.0
         self.last_brow = 0.0
+
+        # Debug Flag
+        self.debug = False
+
+    def set_debug(self, mode: bool):
+        self.debug = mode
+
 
     def get_expression(self, frame):
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -119,29 +127,33 @@ class FaceSense:
 
         confidence = best_score / total  # like softmax-ish normalisation
         confidence = float(round(min(max(confidence, 0.0), 1.0), 2))
-
-        # Smooth prediction
-        self.history.append(expression)
-        smooth_expression = max(set(self.history), key=self.history.count)
-
-        # debugging test 2 - raw feature values, Reducing the prints on every call from 30 fps to 2 fps
-        # self.debug_counter += 1
-        # if self.debug_counter % 15 ==0:
-        #
-        #     print(f"mouth_width={mouth_width:.1f}, lip_gap={lip_gap:.1f}, curve={curve:.2f}, brow={brow:.1f}")
-
-        """
-        object oriented pattern:
-        “Compute inside the model 
-        → expose attributes 
-        → read outside the model"
-        """
+        # expose for external logging
         self.last_mouth_width = mouth_width
         self.last_lip_gap = lip_gap
         self.last_curve = curve
         self.last_brow = brow
 
+        # If debug mode enabled, draw landmarks (if you had them) & debug overlays
+        if self.debug:
+            try:
+                # draw numeric lines
+                draw_debug_features(frame, mouth_width, lip_gap, curve, brow)
+                # compute normalized values for bars using face size to be in 0..1 range
+                mouth_width_n = mouth_width / max(1.0, face_w)
+                lip_gap_n = lip_gap / max(1.0, face_h)
+                curve_n = curve / max(1.0, face_h)
+                brow_n = (brow / max(1.0, face_h)) * -1.0  # if brow negative for "down", invert for visualization
+                draw_feature_bars(frame, mouth_width_n, lip_gap_n, curve_n, brow_n)
+            except Exception as e:
+                # debug drawing must not break detection
+                print("Debug draw error:", e)
+
+        # Smooth prediction (existing code)
+        self.history.append(best_label)
+        smooth_expression = max(set(self.history), key=self.history.count)
+
         return smooth_expression, confidence, bbox
+
 
 
     # blink detection, drowsiness / eye-closure

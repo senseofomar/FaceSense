@@ -27,6 +27,10 @@ def main():
     cap = cv2.VideoCapture(0)
     detector = FaceSense()
 
+    # optionally start in debug OFF; press 'd' to toggle during runtime
+    detector.set_debug(False)
+    print("Debug mode is OFF. Press 'd' in the video window to toggle.")
+
     # Initialize last expression variable INSIDE main (safe scope)
     last_expression = None
 
