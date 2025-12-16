@@ -22,6 +22,12 @@ class FaceSense:
         self.lip_gap_history = deque(maxlen=15)
         self.brow_history = deque(maxlen=15)
 
+        self.angry_counter = 0
+        self.sad_counter = 0
+
+        self.brow_baseline = None
+        self.baseline_frames = 0
+
         # debug
         self.debug = False
         self.debug_counter = 0
@@ -107,15 +113,34 @@ class FaceSense:
         # Brow drop: positive = eyebrows lowered (anger)
         brow_drop_n = max(0.0, -brow / face_h)
 
+        # --- Baseline calibration (first ~30 frames) ---
+        if self.brow_baseline is None:
+            self.baseline_frames += 1
+            if self.baseline_frames <= 30:
+                if self.brow_baseline is None:
+                    self.brow_baseline = brow_drop_n
+                else:
+                    self.brow_baseline = (
+                            0.9 * self.brow_baseline + 0.1 * brow_drop_n
+                    )
+            else:
+                # baseline locked
+                pass
+
+        self.brow_history.append(brow_drop_n)
+        avg_brow_drop = np.mean(self.brow_history)
+
         # Separate positive / negative curvature
         curve_up = max(0.0, curve_n) # smile
         curve_down = max(0.0, -curve_n)  # frown
 
+
+        brow_delta = brow_drop_n - self.brow_baseline
+        brow_delta = max(0.0, brow_delta)
+
         self.curve_history.append(curve_n)
         self.lip_gap_history.append(lip_gap_n)
 
-        self.brow_history.append(brow_drop_n)
-        avg_brow_drop = np.mean(self.brow_history)
 
         # ---------- DEBUG (PRINT NORMALIZED VALUES) ----------
         self.debug_counter += 1
@@ -145,27 +170,50 @@ class FaceSense:
         avg_lip_gap = np.mean(self.lip_gap_history)
 
         # --- Emotion signals ---
-        is_angry = (
-                avg_brow_drop > 0.045 and
-                lip_gap_n < 0.01
+        angry_signal = (
+                brow_delta > 0.025 and
+                lip_gap_n < 0.01 and
+                mouth_width_n < 0.36
         )
 
-        is_sad = (
-                lip_gap_n < 0.005 and
-                mouth_width_n < 0.36 and
-                not is_angry
+        if angry_signal:
+            self.angry_counter += 1
+        else:
+            self.angry_counter = max(0, self.angry_counter - 1)
+
+        is_angry = self.angry_counter >= 6
+
+        sad_signal = (
+                mouth_width_n < 0.34 and
+                lip_gap_n < 0.01 and
+                brow_delta < 0.01
         )
+
+        if sad_signal:
+            self.sad_counter += 1
+        else:
+            self.sad_counter = max(0, self.sad_counter - 1)
+
+        is_sad = self.sad_counter >= 8
 
         # ---------- TEMPORAL HYSTERESIS + EMOTION LOGIC ----------
 
         if self.current_expression == "Happy":
-            # Exit Happy only if smile clearly disappears
             if mouth_width_n < 0.35:
                 self.current_expression = "Neutral"
 
+        elif self.current_expression == "Angry":
+            if self.angry_counter < 3:
+                self.current_expression = "Neutral"
+
+        elif self.current_expression == "Sad":
+            if self.sad_counter < 3:
+                self.current_expression = "Neutral"
+
+
         else:
-            # Not currently Happy
-            if mouth_width_n > 0.40 and lip_gap_n > 0.01:
+            # Neutral state → look for strong signals
+            if mouth_width_n > 0.42 and lip_gap_n > 0.015:
                 self.current_expression = "Happy"
 
             elif is_angry:
@@ -177,22 +225,27 @@ class FaceSense:
             else:
                 self.current_expression = "Neutral"
 
+
         expression = self.current_expression
 
         # Computing confidence
         if expression == "Happy":
             confidence = (mouth_width_n - 0.35) / 0.10
 
+
         elif expression == "Angry":
-            confidence = min(avg_brow_drop / 0.08, 1.0)
+            confidence = min((avg_brow_drop - 0.08) / 0.08, 1.0)
+
 
         elif expression == "Sad":
-            confidence = min((0.36 - mouth_width_n) / 0.10, 1.0)
+            confidence = min((0.36 - mouth_width_n) / 0.08, 1.0)
 
         else:
             confidence = 0.6
 
         confidence = round(max(0.0, min(confidence, 1.0)), 2)
+
+        print("brow_delta:", round(brow_delta, 3))
 
         # If debug mode enabled, draw landmarks (if you had them) & debug overlays
         if self.debug:
