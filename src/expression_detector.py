@@ -15,6 +15,13 @@ class FaceSense:
         # smoothing to prevent flickering
         self.history = deque(maxlen=5)
 
+        # state memory
+        self.current_expression = "Neutral"
+
+        self.curve_history = deque(maxlen=15)
+        self.lip_gap_history = deque(maxlen=15)
+        self.brow_history = deque(maxlen=15)
+
         # debug
         self.debug = False
         self.debug_counter = 0
@@ -26,7 +33,7 @@ class FaceSense:
         self.last_brow = 0.0
 
     def set_debug(self, mode: bool):
-        self.debug = mode
+        self.debug = bool(mode)
 
 
     def get_expression(self, frame):
@@ -42,8 +49,12 @@ class FaceSense:
         landmarks = results.multi_face_landmarks[0]
         h, w, _ = frame.shape
 
-        # Convert landmarks to array
-        points = np.array([(int(lm.x * w), int(lm.y * h)) for lm in landmarks.landmark])
+
+        # Convert landmarks to pixel coordinates
+        points = np.array([
+            (int(lm.x * w), int(lm.y * h))
+            for lm in landmarks.landmark
+        ])
 
         # debugging test 1 - checking the landmark points
         # for i, (x, y) in enumerate(points):
@@ -69,7 +80,7 @@ class FaceSense:
         left_brow = points[70]
         right_brow = points[300]
 
-        # ---------- COMPUTE FEATURES ----------
+        # ---------- COMPUTE RAW FEATURES ----------
 
         # Smile width (bigger = smile)
         mouth_width = np.linalg.norm(left_mouth - right_mouth)
@@ -83,30 +94,43 @@ class FaceSense:
         # Eyebrow height (lower = angry)
         brow = ((left_brow[1] + right_brow[1]) / 2) - upper_lip[1]
 
-        # normalize by face size
-        mouth_width_n = mouth_width / face_w
-        lip_gap_n = lip_gap / face_h
-        curve_n = curve / face_h
-        brow_n = brow / face_h
+        # expose raw values for external logging
+        self.last_mouth_width = mouth_width
+        self.last_lip_gap = lip_gap
+        self.last_curve = curve
+        self.last_brow = brow
 
-        mouth_width_n = max(0.0, mouth_width_n)
-        lip_gap_n = max(0.0, lip_gap_n)
+        # ---------- NORMALIZATION (distance-invariant) ----------
+        mouth_width_n = max(0.0, mouth_width / face_w)
+        lip_gap_n = max(0.0, lip_gap / face_h)
+        curve_n = curve / face_h
+        # Brow drop: positive = eyebrows lowered (anger)
+        brow_drop_n = max(0.0, -brow / face_h)
 
         # Separate positive / negative curvature
-        curve_up = max(0.0, curve_n)  # smile
+        curve_up = max(0.0, curve_n) # smile
         curve_down = max(0.0, -curve_n)  # frown
 
-        # raw feature overlay on live frames
-        draw_debug_features(frame, mouth_width, lip_gap, curve, brow)
+        self.curve_history.append(curve_n)
+        self.lip_gap_history.append(lip_gap_n)
+
+        self.brow_history.append(brow_drop_n)
+        avg_brow_drop = np.mean(self.brow_history)
+
+        # ---------- DEBUG (PRINT NORMALIZED VALUES) ----------
+        self.debug_counter += 1
+        if self.debug and self.debug_counter % 15 == 0:
+            print(
+                f"[NORM] mw={mouth_width_n:.3f}, "
+                f"lg={lip_gap_n:.3f}, "
+                f"curve={curve_n:.3f}, "
+                f"brow={brow_drop_n:.3f}"
+            )
 
         # ---------- SCORE SYSTEM ----------
-        happy_score = 2.0 * mouth_width_n + 3.0 * lip_gap_n + 2.0 * curve_up
+        happy_score = 4.0 * mouth_width_n + 3.0 * lip_gap_n + 2.0 * curve_up
         sad_score = 8.0 * curve_down  # mouth pulled down
         angry_score = 7.0 * curve_down  # also lower mouth / tension, but weaker
-
-        # Hard guard: if mouth isn't really "smiley", kill happy_score
-        if lip_gap_n < 0.01 and curve_up < 0.01:
-            happy_score = 0.0
 
         # Normalize scores to positive only
         scores = {
@@ -116,41 +140,90 @@ class FaceSense:
             "Neutral": 0.3  # baseline
         }
 
-        # computing confidence
-        best_label = max(scores, key=scores.get)
-        best_score = scores[best_label]
-        total = sum(scores.values()) + 1e-6
+        # ---------- TEMPORAL SIGNALS ----------
+        avg_curve = np.mean(self.curve_history)
+        avg_lip_gap = np.mean(self.lip_gap_history)
 
-        if best_score < 0.07:
-            expression = "Neutral"
-        else :
-            expression = best_label
+        # --- Emotion signals ---
+        is_angry = (
+                avg_brow_drop > 0.045 and
+                lip_gap_n < 0.01
+        )
 
-        confidence = best_score / total  # like softmax-ish normalisation
-        confidence = float(round(min(max(confidence, 0.0), 1.0), 2))
-        # expose for external logging
-        self.last_mouth_width = mouth_width
-        self.last_lip_gap = lip_gap
-        self.last_curve = curve
-        self.last_brow = brow
+        is_sad = (
+                lip_gap_n < 0.005 and
+                mouth_width_n < 0.36 and
+                not is_angry
+        )
+
+        # ---------- TEMPORAL HYSTERESIS + EMOTION LOGIC ----------
+
+        if self.current_expression == "Happy":
+            # Exit Happy only if smile clearly disappears
+            if mouth_width_n < 0.35:
+                self.current_expression = "Neutral"
+
+        else:
+            # Not currently Happy
+            if mouth_width_n > 0.40 and lip_gap_n > 0.01:
+                self.current_expression = "Happy"
+
+            elif is_angry:
+                self.current_expression = "Angry"
+
+            elif is_sad:
+                self.current_expression = "Sad"
+
+            else:
+                self.current_expression = "Neutral"
+
+        expression = self.current_expression
+
+        # Computing confidence
+        if expression == "Happy":
+            confidence = (mouth_width_n - 0.35) / 0.10
+
+        elif expression == "Angry":
+            confidence = min(avg_brow_drop / 0.08, 1.0)
+
+        elif expression == "Sad":
+            confidence = min((0.36 - mouth_width_n) / 0.10, 1.0)
+
+        else:
+            confidence = 0.6
+
+        confidence = round(max(0.0, min(confidence, 1.0)), 2)
 
         # If debug mode enabled, draw landmarks (if you had them) & debug overlays
         if self.debug:
             try:
-                # draw numeric lines
-                draw_debug_features(frame, mouth_width, lip_gap, curve, brow)
-                # compute normalized values for bars using face size to be in 0..1 range
-                mouth_width_n = mouth_width / max(1.0, face_w)
-                lip_gap_n = lip_gap / max(1.0, face_h)
-                curve_n = curve / max(1.0, face_h)
-                brow_n = (brow / max(1.0, face_h)) * -1.0  # if brow negative for "down", invert for visualization
-                draw_feature_bars(frame, mouth_width_n, lip_gap_n, curve_n, brow_n)
+                # draw numeric lines / raw values distance dependent
+                draw_debug_features(frame,
+                                    mouth_width,
+                                    lip_gap,
+                                    curve,
+                                    brow
+                                )
+                # clamp for visualization
+                mw_v = min(max(mouth_width_n, 0.0), 1.0)
+                lg_v = min(max(lip_gap_n, 0.0), 1.0)
+                cv_v = min(max(curve_n, -1.0), 1.0)
+                br_v = min(max(-brow_drop_n, 0.0), 1.0)
+
+                # distance independent normalized values
+                draw_feature_bars(
+                    frame,
+                    mw_v,
+                    lg_v,
+                    cv_v,
+                    br_v
+                )
             except Exception as e:
                 # debug drawing must not break detection
                 print("Debug draw error:", e)
 
-        # Smooth prediction (existing code)
-        self.history.append(best_label)
+        # Smooth prediction
+        self.history.append(expression)
         smooth_expression = max(set(self.history), key=self.history.count)
 
         return smooth_expression, confidence, bbox

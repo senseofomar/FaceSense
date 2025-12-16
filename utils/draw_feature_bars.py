@@ -29,4 +29,4 @@ def draw_feature_bars(frame, mouth_w_n, lip_gap_n, curve_n, brow_n, origin=(10, 
         # bar
         cv2.rectangle(frame, (bx, by), (bx + width, by + 12), (0,200,0), -1)
         # label
-        cv2.putText(frame, f"{name} {val:.2f}", (bx + max_width + 8, by + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200,200,200), 1)
+        cv2.putText(frame, f"{name} {val:.2f}", (bx + max_width + 8, by + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (170,100,100), 2)
