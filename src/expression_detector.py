@@ -11,18 +11,19 @@ class FaceSense:
     def __init__(self):
         self.mp_face = mp.solutions.face_mesh
         self.face_mesh = self.mp_face.FaceMesh(refine_landmarks=True)
-        self.debug_counter = 0
+
         # smoothing to prevent flickering
         self.history = deque(maxlen=5)
 
-        # Declare feature placeholders
+        # debug
+        self.debug = False
+        self.debug_counter = 0
+
+        # expose last raw features (for CSV logging, dashboard, etc.)
         self.last_mouth_width = 0.0
         self.last_lip_gap = 0.0
         self.last_curve = 0.0
         self.last_brow = 0.0
-
-        # Debug Flag
-        self.debug = False
 
     def set_debug(self, mode: bool):
         self.debug = mode
