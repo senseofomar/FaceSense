@@ -28,6 +28,9 @@ class FaceSense:
         self.brow_baseline = None
         self.baseline_frames = 0
 
+        self.curve_baseline = None
+        self.curve_baseline_frames = 0
+
         # debug
         self.debug = False
         self.debug_counter = 0
@@ -109,7 +112,20 @@ class FaceSense:
         # ---------- NORMALIZATION (distance-invariant) ----------
         mouth_width_n = max(0.0, mouth_width / face_w)
         lip_gap_n = max(0.0, lip_gap / face_h)
+
         curve_n = curve / face_h
+
+        # --- Curve baseline calibration ---
+        if self.curve_baseline is None:
+            self.curve_baseline_frames += 1
+            if self.curve_baseline_frames <= 30:
+                if self.curve_baseline is None:
+                    self.curve_baseline = curve_n
+                else:
+                    self.curve_baseline = (
+                            0.9 * self.curve_baseline + 0.1 * curve_n
+                    )
+
         # Brow drop: positive = eyebrows lowered (anger)
         brow_drop_n = max(0.0, -brow / face_h)
 
@@ -134,6 +150,7 @@ class FaceSense:
         curve_up = max(0.0, curve_n) # smile
         curve_down = max(0.0, -curve_n)  # frown
 
+        curve_delta = curve_n - self.curve_baseline
 
         brow_delta = brow_drop_n - self.brow_baseline
         brow_delta = max(0.0, brow_delta)
@@ -184,7 +201,7 @@ class FaceSense:
         is_angry = self.angry_counter >= 6
 
         sad_signal = (
-                mouth_width_n < 0.34 and
+                curve_delta < -0.025 and
                 lip_gap_n < 0.01 and
                 brow_delta < 0.01
         )
