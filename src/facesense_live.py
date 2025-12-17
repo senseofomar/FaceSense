@@ -15,6 +15,9 @@ import time
 from utils.io_utils import save_snapshot
 from utils.append_features_csv import append_features_csv
 from utils.draw_results import draw_results
+from models.emotion_model import EmotionModel
+
+
 import warnings
 # Optional: suppress mediapipe/protobuf deprecation warning (harmless)
 warnings.filterwarnings("ignore", message="SymbolDatabase.GetPrototype")
@@ -26,6 +29,7 @@ def main():
     # initialize webcam, detector, etc. (your existing setup)
     cap = cv2.VideoCapture(0)
     detector = FaceSense()
+    emotion_model = EmotionModel("src/models/emotion_model.h5")
 
     # optionally start in debug OFF; press 'd' to toggle during runtime
     detector.set_debug(False)
