@@ -1,13 +1,15 @@
-import mysql.connector
+import MySQLdb
+
 
 def get_connection():
-    return mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="facesense",
-        database="facesense",
-        port=3306
-    )
+    return MySQLdb.connect(
+    host="localhost",
+    user="root",
+    passwd="facesense",
+    db="facesense",
+    port=3306
+)
+
 
 def log_emotion(expression, confidence, bbox, session_id = None):
     try:
