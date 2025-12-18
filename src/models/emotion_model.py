@@ -31,6 +31,9 @@ class EmotionModel:
         # 1. Convert to grayscale
         gray = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2GRAY)
 
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        gray = clahe.apply(gray)
+
         # 2. Resize to FER+ expected size
         gray = cv2.resize(gray, (64, 64))
 
@@ -42,13 +45,24 @@ class EmotionModel:
 
         # 5. Feed network
         self.net.setInput(blob)
-        logits = self.net.forward()
+        raw = self.net.forward()
 
-        # 6. SOFTMAX (THIS IS THE KEY FIX)
+        # 6. FIX: flatten output safely
+        logits = raw.reshape(-1)
+
         probs = softmax(logits)
+        # Ignore Neutral when competing
+        neutral_idx = EMOTIONS.index("Neutral")
+        probs_wo_neutral = probs.copy()
+        probs_wo_neutral[neutral_idx] = 0.0
 
-        idx = int(np.argmax(probs))
-        label = EMOTIONS[idx]
-        confidence = float(probs[idx])
+        best_idx = int(np.argmax(probs_wo_neutral))
+        best_conf = float(probs_wo_neutral[best_idx])
 
-        return label, confidence
+        # Threshold gating
+        if best_conf < 0.35:
+            return "Neutral", float(probs[neutral_idx])
+
+        return EMOTIONS[best_idx], best_conf
+
+
