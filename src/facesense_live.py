@@ -29,7 +29,7 @@ def main():
     # initialize webcam, detector, etc. (your existing setup)
     cap = cv2.VideoCapture(0)
     detector = FaceSense()
-    emotion_model = EmotionModel("src/models/emotion_model.h5")
+    emotion_model = EmotionModel("src/models/fer2013.onnx")
 
     # optionally start in debug OFF; press 'd' to toggle during runtime
     detector.set_debug(False)
