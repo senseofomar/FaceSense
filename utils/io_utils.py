@@ -14,7 +14,9 @@ def save_snapshot(frame, tag="last", folder="snapshots"):
     else:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         final_path = os.path.join(folder, f"{tag}_{ts}.jpg")
-    tmp_path = final_path + ".tmp"
+
+    tmp_path = final_path.replace(".jpg", ".tmp.jpg")
+
     #write to temp file first
     ok = cv2.imwrite(tmp_path, frame)
     if not ok:

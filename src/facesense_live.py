@@ -2,10 +2,10 @@ import cv2
 import time
 
 from expression_detector import FaceSense
-from models.emotion_model import EmotionModel
+from src.db import log_emotion
+from src.models.emotion_model import EmotionModel
 from utils.draw_results import draw_results
 from utils.io_utils import save_snapshot
-from db import log_emotion
 
 SESSION_ID = int(time.time())
 
@@ -14,7 +14,7 @@ def main():
     cap = cv2.VideoCapture(0)
 
     face_detector = FaceSense()
-    emotion_model = EmotionModel("src/models/fer2013.onnx")
+    emotion_model = EmotionModel("\PycharmProjects\FaceSense\src\models\emotion-ferplus.onnx")
 
     last_expression = None
 

@@ -39,6 +39,14 @@ class FaceSense:
         x1, y1 = max(0, x1), max(0, y1)
         x2, y2 = min(w, x2), min(h, y2)
 
+        # Tighten crop slightly (important for FER models)
+        pad = int(0.1 * (x2 - x1))
+        x1 = max(0, x1 + pad)
+        y1 = max(0, y1 + pad)
+        x2 = min(w, x2 - pad)
+        y2 = min(h, y2 - pad)
+
+
         face_crop = frame[y1:y2, x1:x2]
         if face_crop.size == 0:
             return None, None
