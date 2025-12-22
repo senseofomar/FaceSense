@@ -1,54 +1,30 @@
 import torch
 import torch.nn as nn
-import cv2
-import numpy as np
+import torchvision.transforms as T
+from PIL import Image
 
-EMOTIONS = [
-    "Angry", "Disgust", "Fear",
-    "Happy", "Sad", "Surprise", "Neutral"
-]
+# Label order for FER2013
+EMOTIONS = ["Angry", "Disgust", "Fear", "Happy", "Sad", "Surprise", "Neutral"]
 
-class SimpleCNN(nn.Module):
-    def __init__(self):
+class FERModel(nn.Module):
+    def __init__(self, model_path):
         super().__init__()
-        self.features = nn.Sequential(
-            nn.Conv2d(1, 32, 3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-
-            nn.Conv2d(32, 64, 3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2)
-        )
-        self.classifier = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(64 * 12 * 12, 128),
-            nn.ReLU(),
-            nn.Linear(128, 7)
-        )
-
-    def forward(self, x):
-        x = self.features(x)
-        return self.classifier(x)
-
-
-class EmotionModel:
-    def __init__(self, weight_path):
-        self.device = "cpu"
-        self.model = SimpleCNN().to(self.device)
-        self.model.load_state_dict(torch.load(weight_path, map_location=self.device))
+        # Replace with the exact architecture that matches the .pth
+        self.model = ... # define VGG19 or CNN
+        self.model.load_state_dict(torch.load(model_path, map_location="cpu"))
         self.model.eval()
 
-    def predict(self, face_bgr):
-        gray = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2GRAY)
-        gray = cv2.resize(gray, (48, 48))
-
-        x = gray.astype(np.float32) / 255.0
-        x = torch.tensor(x).unsqueeze(0).unsqueeze(0)
-
+    def predict(self, img):
+        # img is PIL Image
+        transform = T.Compose([
+            T.Grayscale(),
+            T.Resize((48,48)),
+            T.ToTensor(),
+            T.Normalize((0.5,), (0.5,))
+        ])
+        x = transform(img).unsqueeze(0)  # batch
         with torch.no_grad():
-            logits = self.model(x)
-            probs = torch.softmax(logits, dim=1)[0]
-
-        idx = int(torch.argmax(probs))
-        return EMOTIONS[idx], float(probs[idx]), probs.numpy()
+            out = self.model(x)
+            probs = torch.softmax(out, dim=1).squeeze()
+            idx = torch.argmax(probs).item()
+        return EMOTIONS[idx], probs[idx].item()

@@ -5,6 +5,9 @@ import cv2
 from face_detector import FaceDetector
 from models.emotion_model import EmotionModel
 
+RAW_DIR = "data/raw"
+OUT_DIR = "data/processed"
+MODEL_PATH = "models/fer2013_cnn.pt"
 
 def main():
     if len(sys.argv) != 2:
@@ -23,9 +26,6 @@ def main():
         sys.exit(1)
 
     detector = FaceDetector()
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    MODEL_PATH = os.path.join(BASE_DIR, "models", "emotion-ferplus.onnx")
-
     model = EmotionModel(MODEL_PATH)
 
     face, bbox = detector.detect(image)
@@ -64,9 +64,9 @@ def main():
     print(f"Emotion: {label}")
     print(f"Confidence: {confidence:.2f}\n")
 
-    print("Probabilities:")
-    for k, v in probs.items():
-        print(f"{k:<10} {v:.3f}")
+    print("\nProbabilities:")
+    for e, p in zip(model.EMOTIONS if hasattr(model, "EMOTIONS") else [], probs):
+        print(f"{e:10s} {p:.3f}")
 
     print(f"\nSaved → {out_path}")
 
