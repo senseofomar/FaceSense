@@ -31,6 +31,7 @@ class FaceDetector:
         x2 = int((box.xmin + box.width) * w)
         y2 = int((box.ymin + box.height) * h)
 
+        # Clamp
         x1, y1 = max(0, x1), max(0, y1)
         x2, y2 = min(w, x2), min(h, y2)
 

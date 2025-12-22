@@ -1,8 +1,8 @@
 import cv2
 
 from src.db import log_emotion
-from src.expression_detector import FaceSense
-from src.facesense_live import confidence
+from thrashed.expression_detector import FaceSense
+from thrashed.facesense_live import confidence
 
 
 def draw_results(frame, bbox, label, confidence):
