@@ -1,73 +1,61 @@
+# src/models/emotion_model.py
+
 import torch
 import torch.nn as nn
-from torchvision import models, transforms
+import torchvision.models as models
+import torchvision.transforms as T
 from PIL import Image
 import os
 
-# FER2013 label order (this matters!)
-EMOTIONS = [
-    "Angry",
-    "Disgust",
-    "Fear",
-    "Happy",
-    "Sad",
-    "Surprise",
-    "Neutral"
-]
+EMOTIONS = ["Angry", "Disgust", "Fear", "Happy", "Sad", "Surprise", "Neutral"]
 
-class EmotionModel:
-    def __init__(self, model_path: str):
+class EmotionModel(nn.Module):
+    def __init__(self, model_path):
+        super().__init__()
+
         model_path = os.path.abspath(model_path)
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"FER model not found at:\n{model_path}")
 
-        # --- Build VGG19 ---
-        self.model = models.vgg19(weights=None)
-
-        # Change input conv: 3 → 1 channel
-        self.model.features[0] = nn.Conv2d(
-            in_channels=1,
-            out_channels=64,
-            kernel_size=3,
-            stride=1,
-            padding=1
-        )
-
-        # Change classifier head → 7 emotions
-        self.model.classifier[6] = nn.Linear(4096, 7)
-
-        # Load trained weights
+        # Load checkpoint
         state = torch.load(model_path, map_location="cpu")
-        self.model.load_state_dict(state, strict=True)
+        if isinstance(state, dict) and "net" in state:
+            state = state["net"]
 
-        self.model.eval()
+        # Build EXACT matching model
+        base = models.vgg19_bn(weights=None)
 
-        # Preprocessing MUST match training
-        self.transform = transforms.Compose([
-            transforms.Grayscale(num_output_channels=1),
-            transforms.Resize((48, 48)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5], std=[0.5])
+        self.features = base.features
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.classifier = nn.Linear(512, 7)
+
+        self.load_state_dict(state, strict=True)
+        self.eval()
+
+        self.transform = T.Compose([
+            T.Resize((224, 224)),
+            T.ToTensor(),
+            T.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225],
+            ),
         ])
 
-    def predict(self, image_path: str):
-        """
-        image_path: path to image file
-        returns: (label, confidence, probs_dict)
-        """
-        img = Image.open(image_path).convert("RGB")
+    def forward(self, x):
+        x = self.features(x)
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        return self.classifier(x)
+
+    def predict(self, face_bgr):
+        face_rgb = face_bgr[:, :, ::-1]
+        img = Image.fromarray(face_rgb)
+
         x = self.transform(img).unsqueeze(0)
 
         with torch.no_grad():
-            logits = self.model(x)
-            probs = torch.softmax(logits, dim=1)[0]
+            logits = self.forward(x)
+            probs = torch.softmax(logits, dim=1).squeeze()
 
-        idx = int(torch.argmax(probs))
-        confidence = float(probs[idx])
-
-        probs_dict = {
-            EMOTIONS[i]: float(probs[i])
-            for i in range(len(EMOTIONS))
-        }
-
-        return EMOTIONS[idx], confidence, probs_dict
+        idx = probs.argmax().item()
+        return EMOTIONS[idx], float(probs[idx]), probs.tolist()

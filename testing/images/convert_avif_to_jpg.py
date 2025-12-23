@@ -15,5 +15,5 @@ for f in os.listdir(src):
         print("Converted:", f)
 
 python src/facesense_cli.py testing/images/angry.png
-python src/facesense_cli.py data/raw/disgust1.png
+python src/facesense_cli.py data/raw/angry2.jpg
 
