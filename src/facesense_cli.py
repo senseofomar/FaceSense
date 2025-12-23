@@ -3,11 +3,11 @@ import os
 import cv2
 
 from face_detector import FaceDetector
-from models.emotion_model import FERModel
+from models.emotion_model import EmotionModel
 
 RAW_DIR = "data/raw"
 OUT_DIR = "data/processed"
-MODEL_PATH = "models/fer2013_cnn.pt"
+MODEL_FILE = "fer2013_vgg19.pth"
 
 def main():
     if len(sys.argv) != 2:
@@ -26,7 +26,7 @@ def main():
         sys.exit(1)
 
     detector = FaceDetector()
-    model = FERModel(MODEL_PATH)
+    model = EmotionModel(MODEL_FILE)
 
     face, bbox = detector.detect(image)
 
