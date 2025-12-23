@@ -4,6 +4,7 @@ import cv2
 
 from face_detector import FaceDetector
 from models.emotion_model import EmotionModel
+from models.emotion_model import EMOTIONS
 
 MODEL_PATH = "src/models/fer2013_vgg19.pth"
 
@@ -39,8 +40,10 @@ def main():
     print(f"Confidence: {confidence:.2f}\n")
 
     print("Probabilities:")
-    for k, v in probs.items():
-        print(f"{k:<10} {v:.3f}")
+
+    for emotion, prob in zip(EMOTIONS, probs):
+        print(f"{emotion:<10} {prob:.3f}")
+
 
 if __name__ == "__main__":
     main()
