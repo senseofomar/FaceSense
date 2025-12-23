@@ -3,7 +3,7 @@ import os
 import cv2
 
 from face_detector import FaceDetector
-from models.emotion_model import EmotionModel
+from models.emotion_model import FERModel
 
 RAW_DIR = "data/raw"
 OUT_DIR = "data/processed"
@@ -26,7 +26,7 @@ def main():
         sys.exit(1)
 
     detector = FaceDetector()
-    model = EmotionModel(MODEL_PATH)
+    model = FERModel(MODEL_PATH)
 
     face, bbox = detector.detect(image)
 
