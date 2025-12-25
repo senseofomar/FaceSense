@@ -1,33 +1,43 @@
-from deepface import DeepFace
-import cv2
-import numpy as np
+import torch
+import torch.nn as nn
+import torchvision.models as models
+import torchvision.transforms as T
+from PIL import Image
+import os
+
+EMOTIONS = ["Angry", "Disgust", "Fear", "Happy", "Sad", "Surprise", "Neutral"]
 
 
-class EmotionModel:
-    def __init__(self, model_name="sfer"):
-        # "race" and "gender" are disabled to speed it up
-        # "sfer" (Simplified FER) is fast and accurate, or use "emotion" (default)
-        self.model_name = "DeepFace"
+class EmotionModel(nn.Module):
+    def __init__(self, model_path):
+        super().__init__()
+        # ... (Keep your VGG loading code exactly as is) ...
+        # (Assuming your VGG loading logic matches your specific .pth file)
+
+        # --- FIX: New Transform ---
+        self.transform = T.Compose([
+            T.Resize((224, 224)),
+            T.ToTensor(),
+            # REMOVED ImageNet Normalization. 
+            # Most FER models just want 0-1 tensors (which ToTensor does).
+            # If your model specifically expects Grayscale, you might need T.Grayscale(num_output_channels=3)
+        ])
+
+        # If the model continues to fail, try uncommenting this normalization:
+        # T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
 
     def predict(self, face_bgr):
-        # DeepFace expects path or numpy array
-        try:
-            # enforce_detection=False because we already cropped the face
-            objs = DeepFace.analyze(
-                img_path=face_bgr,
-                actions=['emotion'],
-                enforce_detection=False,
-                detector_backend='skip',
-                silent=True
-            )
-        except ValueError:
-            return "Unknown", 0.0, {}
+        # Convert BGR to RGB
+        face_rgb = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2RGB)
+        img = Image.fromarray(face_rgb)
 
-        result = objs[0]
-        dominant_emotion = result['dominant_emotion']
-        confidence = result['emotion'][dominant_emotion]
+        # Transform
+        x = self.transform(img).unsqueeze(0)
 
-        # Normalize probs to 0-1 range if they aren't
-        probs = result['emotion']
+        self.eval()
+        with torch.no_grad():
+            logits = self.forward(x)
+            probs = torch.softmax(logits, dim=1).squeeze()
 
-        return dominant_emotion, confidence, probs
+        idx = probs.argmax().item()
+        return EMOTIONS[idx], float(probs[idx]), probs.tolist()
