@@ -1,52 +1,34 @@
 import cv2
-import mediapipe as mp
 import numpy as np
 
 
 class FaceDetector:
     def __init__(self):
-        self.mp_face = mp.solutions.face_detection
-        self.detector = self.mp_face.FaceDetection(
-            model_selection=1,  # Change to 1 for full-range (better for different distances)
-            min_detection_confidence=0.5
-        )
+        # Using OpenCV's built-in Haar Cascade detector
+        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        self.detector = cv2.CascadeClassifier(cascade_path)
 
     def detect(self, image_bgr, padding_pct=0.15):
-        """
-        Detects face and returns a padded crop.
-        padding_pct: Percentage of padding to add (0.15 = 15%)
-        """
-        rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
-        results = self.detector.process(rgb)
+        gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+        # Detect faces
+        faces = self.detector.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
 
-        if not results.detections:
+        if len(faces) == 0:
             return None, None
 
-        # Get the largest face if multiple are present
-        det = max(results.detections, key=lambda d: d.location_data.relative_bounding_box.width)
+        # Get the largest face
+        (x, y, w, h) = max(faces, key=lambda b: b[2] * b[3])
 
-        h, w, _ = image_bgr.shape
-        box = det.location_data.relative_bounding_box
+        # Add Padding
+        dx = int(w * padding_pct)
+        dy = int(h * padding_pct)
 
-        # 1. Calculate base coordinates
-        x1 = int(box.xmin * w)
-        y1 = int(box.ymin * h)
-        bw = int(box.width * w)
-        bh = int(box.height * h)
+        # Calculate coordinates with padding and boundary checks
+        img_h, img_w = image_bgr.shape[:2]
+        y1 = max(0, y - dy)
+        y2 = min(img_h, y + h + dy)
+        x1 = max(0, x - dx)
+        x2 = min(img_w, x + w + dx)
 
-        # 2. Add Padding (Context is crucial for emotions)
-        dx = int(bw * padding_pct)
-        dy = int(bh * padding_pct)
-
-        x1 = max(0, x1 - dx)
-        y1 = max(0, y1 - dy)
-        x2 = min(w, x1 + bw + (2 * dx))
-        y2 = min(h, y1 + bh + (2 * dy))
-
-        # 3. Crop
         face_crop = image_bgr[y1:y2, x1:x2]
-
-        if face_crop.size == 0:
-            return None, None
-
-        return face_crop, (x1, y1, x2, y2)
+        return face_crop, (x1, y1, x2 - x1, y2 - y1)

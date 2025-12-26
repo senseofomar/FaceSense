@@ -5,7 +5,6 @@ import numpy as np
 
 # Import your chosen model wrapper here
 from face_detector import FaceDetector
-from models.emotion_model import EmotionModel # <-- Use this for your PyTorch VGG
 
 def main():
     if len(sys.argv) != 2:

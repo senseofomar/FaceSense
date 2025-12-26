@@ -2,63 +2,71 @@ import torch
 import cv2
 import os
 import sys
+from torchvision import transforms
 
-# 1. SETUP PATHS (Portably)
-# This is the 'src' folder
+# 1. PATH SETUP
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-# This is the 'FaceSense' root folder
-ROOT_DIR = os.path.dirname(SCRIPT_DIR)
+sys.path.append(SCRIPT_DIR)
 
-# Path to weights: FaceSense/src/models/fer2013_vgg19.pth
-MODEL_PATH = os.path.join(SCRIPT_DIR, 'models', 'fer2013_vgg19.pth')
-# Path to images: FaceSense/data/raw/
-IMAGE_DIR = os.path.join(ROOT_DIR, 'data', 'raw')
-
-# Import your model class
+# Import local modules
 from models.load_model import FaceSenseVGG19
+from face_detector import FaceDetector
 
-# 2. SETUP DEVICE AND MODEL
+# 2. DEVICE & MODEL
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+detector = FaceDetector()
 model = FaceSenseVGG19(num_classes=7)
 
-# 3. LOAD WEIGHTS
-if not os.path.exists(MODEL_PATH):
-    print(f"❌ Error: Weights not found at {MODEL_PATH}")
-    print("Check if the .pth file is actually inside src/models/")
-    sys.exit()
+# Adjust path to where your .pth is located inside src/models/
+MODEL_PATH = os.path.join(SCRIPT_DIR, 'models', 'fer2013_vgg19.pth')
 
 checkpoint = torch.load(MODEL_PATH, map_location=device)
 model.load_state_dict(checkpoint['net'])
-model.to(device)
-model.eval()
-print(f"✅ Model loaded from {MODEL_PATH}")
+model.to(device).eval()
 
-labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
+# 3. FIXED LABEL MAPPING (Alphabetical Order to fix Happy/Sad flip)
+labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise']
+
+# 4. PREPROCESSING (Matching VGG19-BN Expectations)
+data_transforms = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.Resize((48, 48)),
+    transforms.ToTensor(),
+    # Normalizing to [-1, 1] range which is standard for BN layers
+    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+])
 
 
 def predict_emotion(image_filename):
-    full_path = os.path.join(IMAGE_DIR, image_filename)
-    img = cv2.imread(full_path)
+    # Images are in FaceSense/data/raw/
+    root_dir = os.path.dirname(SCRIPT_DIR)
+    image_path = os.path.join(root_dir, 'data', 'raw', image_filename)
 
+    img = cv2.imread(image_path)
     if img is None:
-        print(f"❌ Image not found: {full_path}")
-        return
+        return f"❌ File not found: {image_path}"
 
-    # Standard Preprocessing
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    gray = cv2.resize(gray, (48, 48))
-    img_tensor = torch.from_numpy(gray).float() / 255.0
-    img_tensor = img_tensor.unsqueeze(0).unsqueeze(0).repeat(1, 3, 1, 1).to(device)
+    # Use the detector to find the face (Critical for accuracy)
+    face_crop, _ = detector.detect(img, padding_pct=0.1)
 
-    with torch.no_grad():
-        outputs = model(img_tensor)
-        _, predicted = torch.max(outputs, 1)
-        return labels[predicted.item()]
+    if face_crop is not None:
+        # Convert to RGB and Transform
+        img_rgb = cv2.cvtColor(face_crop, cv2.COLOR_BGR2RGB)
+        img_tensor = data_transforms(img_rgb).unsqueeze(0).to(device)
+
+        with torch.no_grad():
+            outputs = model(img_tensor)
+            probabilities = torch.nn.functional.softmax(outputs, dim=1)
+            conf, predicted = torch.max(probabilities, 1)
+
+            emotion = labels[predicted.item()]
+            return f"RESULT: {emotion} ({conf.item() * 100:.2f}%)"
+    else:
+        return "❌ Face detector could not find a face."
 
 
 if __name__ == "__main__":
-    # Ensure there is a file named 'test.jpg' in FaceSense/data/raw/
-    test_img = "fear1.jpg"
-    result = predict_emotion(test_img)
-    if result:
-        print(f"Prediction for {test_img}: {result}")
+    # Ensure this file is in your data/raw folder
+    test_img = "angry2.jpg"
+    print(f"--- Running Inference on {test_img} ---")
+    print(predict_emotion(test_img))

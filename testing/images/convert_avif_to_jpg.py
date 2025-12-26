@@ -14,6 +14,4 @@ for f in os.listdir(src):
         img.convert("RGB").save(os.path.join(dst, out), "JPEG", quality=95)
         print("Converted:", f)
 
-python src/facesense_cli.py testing/images/angry.png
-python src/facesense_cli.py data/raw/happy2.jpg
 
