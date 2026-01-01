@@ -67,6 +67,6 @@ def predict_emotion(image_filename):
 
 if __name__ == "__main__":
     # Ensure this file is in your data/raw folder
-    test_img = "angry2.jpg"
+    test_img = "neutral.png"
     print(f"--- Running Inference on {test_img} ---")
     print(predict_emotion(test_img))
