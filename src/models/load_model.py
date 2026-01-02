@@ -7,17 +7,14 @@ class FaceSenseVGG19(nn.Module):
         super(FaceSenseVGG19, self).__init__()
         # 1. Use Pre-trained weights (Transfer Learning) - HUGE Accuracy Boost
         # Instead of weights=None, we use ImageNet weights as a starting point.
-        weights = models.VGG19_BN_Weights.DEFAULT
+        weights = None
         vgg19_base = models.vgg19_bn(weights=weights)
 
         self.features = vgg19_base.features
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
         # 2. Add Dropout to the classifier
-        self.classifier = nn.Sequential(
-            nn.Identity(),  # classifier.0
-            nn.Linear(512, num_classes)  # classifier.1 (This matches your error!)
-        )
+        self.classifier = nn.Linear(512, num_classes)  # classifier.1 (This matches your error!)
 
     def forward(self, x):
         x = self.features(x)

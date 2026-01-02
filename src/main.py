@@ -21,8 +21,20 @@ model = FaceSenseVGG19(num_classes=7)
 MODEL_PATH = os.path.join(SCRIPT_DIR, 'models', 'fer2013_vgg19.pth')
 
 checkpoint = torch.load(MODEL_PATH, map_location=device)
-model.load_state_dict(checkpoint['net'])
+state_dict = checkpoint['net']
+
+# --- NEW KEY REMAPPING LOGIC ---
+# This fixes the "Missing/Unexpected" error by renaming keys on the fly
+new_state_dict = {}
+for k, v in state_dict.items():
+    # If the file has 'classifier.1.weight', change it to 'classifier.weight'
+    name = k.replace('classifier.1.', 'classifier.')
+    new_state_dict[name] = v
+
+# Load the cleaned state dict
+model.load_state_dict(new_state_dict)
 model.to(device).eval()
+# -------------------------------
 
 # 3. FIXED LABEL MAPPING (Alphabetical Order to fix Happy/Sad flip)
 labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise']
@@ -67,6 +79,6 @@ def predict_emotion(image_filename):
 
 if __name__ == "__main__":
     # Ensure this file is in your data/raw folder
-    test_img = "happy1.jpg"
+    test_img = "fear1.jpg"
     print(f"--- Running Inference on {test_img} ---")
     print(predict_emotion(test_img))
