@@ -15,8 +15,8 @@ class FaceSenseVGG19(nn.Module):
 
         # 2. Add Dropout to the classifier
         self.classifier = nn.Sequential(
-            nn.Dropout(p=0.5),  # Randomly zero out 50% of neurons during training
-            nn.Linear(512, num_classes)
+            nn.Identity(),  # classifier.0
+            nn.Linear(512, num_classes)  # classifier.1 (This matches your error!)
         )
 
     def forward(self, x):
@@ -25,3 +25,4 @@ class FaceSenseVGG19(nn.Module):
         x = torch.flatten(x, 1)
         x = self.classifier(x)
         return x
+
