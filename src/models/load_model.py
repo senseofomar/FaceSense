@@ -2,19 +2,22 @@ import torch
 import torch.nn as nn
 from torchvision import models
 
-
 class FaceSenseVGG19(nn.Module):
     def __init__(self, num_classes=7):
         super(FaceSenseVGG19, self).__init__()
-        # Use vgg19_bn (Batch Normalization) instead of standard vgg19
-        # This matches the "running_mean" and "running_var" keys in your file
-        vgg19_base = models.vgg19_bn(weights=None)
+        # 1. Use Pre-trained weights (Transfer Learning) - HUGE Accuracy Boost
+        # Instead of weights=None, we use ImageNet weights as a starting point.
+        weights = models.VGG19_BN_Weights.DEFAULT
+        vgg19_base = models.vgg19_bn(weights=weights)
 
         self.features = vgg19_base.features
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
-        # This matches the [7, 512] shape we confirmed earlier
-        self.classifier = nn.Linear(512, num_classes)
+        # 2. Add Dropout to the classifier
+        self.classifier = nn.Sequential(
+            nn.Dropout(p=0.5),  # Randomly zero out 50% of neurons during training
+            nn.Linear(512, num_classes)
+        )
 
     def forward(self, x):
         x = self.features(x)
