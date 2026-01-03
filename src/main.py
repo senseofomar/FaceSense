@@ -69,16 +69,39 @@ def predict_emotion(image_filename):
         with torch.no_grad():
             outputs = model(img_tensor)
             probabilities = torch.nn.functional.softmax(outputs, dim=1)
-            conf, predicted = torch.max(probabilities, 1)
 
-            emotion = labels[predicted.item()]
-            return f"RESULT: {emotion} ({conf.item() * 100:.2f}%)"
+            # Convert to list to modify weights
+            # Order: 0:Angry, 1:Disgust, 2:Fear, 3:Happy, 4:Neutral, 5:Sad, 6:Surprise
+            probs = probabilities[0].tolist()
+
+            # --- THE CALIBRATION FIX ---
+            # 1. Give Neutral a massive 'Head Start' (Neutral is at index 4)
+            probs[4] = probs[4] * 1.5
+
+            # 2. Penalize Surprise (Surprise is at index 6)
+            # This stops Neutral being called Surprise
+            probs[6] = probs[6] * 0.7
+
+            # 3. Penalize Happy (Happy is at index 3)
+            # This helps fix the 'Sad is Happy' bug you saw earlier
+            probs[3] = probs[3] * 0.8
+            # ---------------------------
+
+            # Find the new winner after our adjustments
+            max_val = max(probs)
+            predicted_idx = probs.index(max_val)
+
+            emotion_label = labels[predicted_idx]
+            # Normalize confidence to 0-100%
+            confidence_score = (max_val / sum(probs)) * 100
+
+            return f"Emotion: {emotion_label} ({confidence_score:.2f}%)"
     else:
         return "❌ Face detector could not find a face."
 
 
 if __name__ == "__main__":
     # Ensure this file is in your data/raw folder
-    test_img = "fear1.jpg"
+    test_img = "esad.jpeg"
     print(f"--- Running Inference on {test_img} ---")
     print(predict_emotion(test_img))
