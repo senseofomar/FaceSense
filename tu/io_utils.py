@@ -1,6 +1,7 @@
 # utils/io_utils.py
 import os
 import cv2
+import time
 from datetime import datetime
 
 
@@ -15,17 +16,28 @@ def save_snapshot(frame, tag="last", folder="snapshots"):
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         final_path = os.path.join(folder, f"{tag}_{ts}.jpg")
 
-    tmp_path = final_path.replace(".jpg", ".tmp.jpg")
+        # UNIQUE temp file (important on Windows)
+        tmp_path = final_path.replace(
+            ".jpg",
+            f".{os.getpid()}.tmp.jpg"
+        )
 
-    #write to temp file first
-    ok = cv2.imwrite(tmp_path, frame)
-    if not ok:
-        raise RuntimeError(f"Failed to save snapshot to {tmp_path}")
+        # Write temp file
+        ok = cv2.imwrite(tmp_path, frame)
+        if not ok:
+            raise RuntimeError(f"Failed to save snapshot to {tmp_path}")
 
-    #Atomic rename
-    os.replace(tmp_path, final_path)
+        # Retry atomic replace (Windows-safe)
+        for _ in range(5):
+            try:
+                os.replace(tmp_path, final_path)
+                return final_path
+            except PermissionError:
+                time.sleep(0.05)
 
-    return final_path
+        # Last attempt (fail loudly)
+        os.replace(tmp_path, final_path)
+        return final_path
 
 
 """

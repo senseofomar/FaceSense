@@ -91,6 +91,7 @@ with col1:
     img = load_last_snapshot()
     if img is not None:
         st.image(img, width=700)
+        st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
     else:
         msg = st.session_state.get("_snapshot_debug", "No snapshot found. Run FaceSense to create snapshots.")
         st.info(msg)
