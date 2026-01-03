@@ -2,10 +2,10 @@ import cv2
 import time
 
 from thrashed.expression_detector import FaceSense
-from src.db import log_emotion
+from tu.db import log_emotion
 from src.models.emotion_model import EmotionModel
 from utils.draw_results import draw_results
-from utils.io_utils import save_snapshot
+from tu.io_utils import save_snapshot
 
 SESSION_ID = int(time.time())
 

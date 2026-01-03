@@ -1,5 +1,8 @@
 import cv2
 from deepface import DeepFace
+from io_utils import save_snapshot
+from tu.db import log_emotion
+
 
 
 def init_camera():
@@ -68,6 +71,20 @@ def main():
                     2,
                     cv2.LINE_AA
                 )
+                # Save latest frame (for dashboard)
+                save_snapshot(frame, tag="last")
+
+                confidence = result[0]["emotion"][dominant_emotion] / 100.0
+
+                bbox = (x, y, x + w, y + h)
+
+                log_emotion(
+                    expression=dominant_emotion,
+                    confidence=confidence,
+                    bbox=bbox,
+                    session_id="webcam"
+                )
+
 
             except Exception as e:
                 # DeepFace may fail on some frames

@@ -1,6 +1,6 @@
 import cv2
 
-from src.db import log_emotion
+from tu.db import log_emotion
 from thrashed.expression_detector import FaceSense
 from thrashed.facesense_live import confidence
 
