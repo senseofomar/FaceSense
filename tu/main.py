@@ -16,14 +16,23 @@ def load_image(image_path: str):
     print(f"✅ Image loaded successfully: {image_path}")
     return img
 
+def detect_faces(img):
+    """Detect faces using Haar Cascade."""
+    face_cascade = cv2.CascadeClassifier(
+        cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+    )
 
-def display_image(img):
-    """Display image using matplotlib."""
-    rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    plt.imshow(rgb_img)
-    plt.axis("off")
-    plt.title("Input Image")
-    plt.show()
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    faces = face_cascade.detectMultiScale(
+        gray,
+        scaleFactor=1.1,
+        minNeighbors=5,
+        minSize=(60, 60)
+    )
+
+    print(f"👤 Faces detected: {len(faces)}")
+    return faces
 
 
 def analyze_emotion(img):
@@ -52,9 +61,43 @@ def analyze_emotion(img):
     return dominant_emotion, emotion_scores
 
 
+
+
+def draw_results(img, faces, emotion):
+    """Draw bounding boxes and emotion label."""
+    for (x, y, w, h) in faces:
+        # Draw face rectangle
+        cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+        # Put emotion text above face
+        cv2.putText(
+            img,
+            emotion,
+            (x, y - 10),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.9,
+            (0, 0, 255),
+            2,
+            cv2.LINE_AA
+        )
+
+    return img
+
+
+def display_image(img, title="Result"):
+    rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    plt.imshow(rgb_img)
+    plt.axis("off")
+    plt.title(title)
+    plt.show()
+
+
 if __name__ == "__main__":
-    IMAGE_PATH = "disgust1.png"   # or full path if needed
+    IMAGE_PATH = "disgust1.png"
 
     image = load_image(IMAGE_PATH)
-    display_image(image)
-    analyze_emotion(image)
+    faces = detect_faces(image)
+    emotion = analyze_emotion(image)
+
+    output = draw_results(image, faces, emotion)
+    display_image(output, title="FaceSense – Emotion Detection")
