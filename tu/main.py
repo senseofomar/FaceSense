@@ -93,11 +93,12 @@ def display_image(img, title="Result"):
 
 
 if __name__ == "__main__":
-    IMAGE_PATH = "disgust1.png"
+    IMAGE_PATH = "angry2.jpg"
 
     image = load_image(IMAGE_PATH)
     faces = detect_faces(image)
-    emotion = analyze_emotion(image)
 
-    output = draw_results(image, faces, emotion)
+    dominant_emotion, emotion_scores = analyze_emotion(image)
+
+    output = draw_results(image, faces, dominant_emotion)
     display_image(output, title="FaceSense – Emotion Detection")
