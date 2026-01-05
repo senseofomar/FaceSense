@@ -93,7 +93,7 @@ def display_image(img, title="Result"):
 
 
 if __name__ == "__main__":
-    IMAGE_PATH = "angry2.jpg"
+    IMAGE_PATH = "../../tu/angry2.jpg"
 
     image = load_image(IMAGE_PATH)
     faces = detect_faces(image)

@@ -1,4 +1,4 @@
-from db import get_connection
+from facesense.data import get_connection
 
 print("Starting test...")
 

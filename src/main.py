@@ -50,9 +50,9 @@ data_transforms = transforms.Compose([
 
 
 def predict_emotion(image_filename):
-    # Images are in FaceSense/data/raw/
+    # Images are in FaceSense/storage/raw/
     root_dir = os.path.dirname(SCRIPT_DIR)
-    image_path = os.path.join(root_dir, 'data', 'raw', image_filename)
+    image_path = os.path.join(root_dir, 'storage', 'raw', image_filename)
 
     img = cv2.imread(image_path)
     if img is None:
@@ -101,7 +101,7 @@ def predict_emotion(image_filename):
 
 
 if __name__ == "__main__":
-    # Ensure this file is in your data/raw folder
+    # Ensure this file is in your storage/raw folder
     test_img = "esad.jpeg"
     print(f"--- Running Inference on {test_img} ---")
     print(predict_emotion(test_img))

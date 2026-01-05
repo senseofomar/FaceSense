@@ -39,7 +39,7 @@ def main():
     model.load_state_dict(checkpoint['net'])
     model.to(device).eval()
 
-    # Define Transforms (Same as main.py)
+    # Define Transforms (Same as static.py)
     data_transforms = transforms.Compose([
         transforms.ToPILImage(),
         transforms.Resize((48, 48)),

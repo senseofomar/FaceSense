@@ -1,5 +1,5 @@
 import csv, os
-def append_features_csv(row, folder="data", filename="features.csv"):
+def append_features_csv(row, folder="storage", filename="features.csv"):
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     os.makedirs(os.path.join(project_root, folder), exist_ok=True)
     path = os.path.join(project_root, folder, filename)

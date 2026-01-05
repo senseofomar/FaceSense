@@ -1,7 +1,7 @@
 import cv2
 from deepface import DeepFace
-from tu.io_utils import save_snapshot
-from tu.db import log_emotion
+from facesense.snapshots.snapshot import save_snapshot
+from facesense.data.db import log_emotion
 
 
 

@@ -1,4 +1,4 @@
-# utils/io_utils.py
+# utils/snapshot.py
 import os
 import cv2
 import time
@@ -6,7 +6,7 @@ from datetime import datetime
 
 
 def save_snapshot(frame, tag="last", folder="snapshots"):
-    folder = os.path.join(os.path.dirname(__file__), "..", "snapshots")
+    folder = os.path.join(os.path.dirname(__file__), "../..", "snapshots")
     folder = os.path.abspath(folder)
     os.makedirs(folder, exist_ok=True)
 
