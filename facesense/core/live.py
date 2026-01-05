@@ -24,12 +24,16 @@ def main():
         if not ret:
             break
 
+        # 🔁 MIRROR VIEW (horizontal flip)
+        frame = cv2.flip(frame, 1)
+
         frame_count += 1
         faces = detect_faces(frame)
 
         for (x, y, w, h) in faces:
             face_roi = frame[y:y+h, x:x+w]
 
+            # Run emotion inference every 5 frames
             if frame_count % 5 == 0:
                 try:
                     emotion, confidence = analyze_emotion(face_roi)
@@ -43,26 +47,38 @@ def main():
                 except Exception:
                     pass
 
-            cv2.rectangle(frame, (x,y), (x+w,y+h), (0,255,0), 2)
+            # Draw bounding box
+            cv2.rectangle(
+                frame,
+                (x, y),
+                (x + w, y + h),
+                (0, 255, 0),
+                2
+            )
+
+            # Draw emotion label
             if last_emotion:
                 cv2.putText(
                     frame,
                     last_emotion,
-                    (x, y-10),
+                    (x, y - 10),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.9,
-                    (0,0,255),
+                    (0, 0, 255),
                     2
                 )
 
+        # Save snapshot for dashboard
         save_snapshot(frame)
-        cv2.imshow("FaceSense – Live", frame)
+
+        cv2.imshow("FaceSense – Live (Mirror View)", frame)
 
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
 
     cap.release()
     cv2.destroyAllWindows()
+    print("🛑 Webcam stopped.")
 
 if __name__ == "__main__":
     main()
