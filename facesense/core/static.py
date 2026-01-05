@@ -36,3 +36,7 @@ def run_on_image(image_path, log_to_db=True):
     cv2.imshow("FaceSense – Static", img)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    run_on_image("angryac.jpeg")
