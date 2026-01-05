@@ -1,9 +1,12 @@
 import cv2
+import os
+from pathlib import Path
+
 from facesense.core.face_detector import detect_faces
 from facesense.core.emotion import analyze_emotion
 from facesense.storage.db import log_emotion
 
-def run_on_image(image_path, log_to_db=True):
+def run_on_image(image_path, show = True, log_to_db=True):
     img = cv2.imread(image_path)
     if img is None:
         raise ValueError("Invalid image path")
@@ -33,10 +36,22 @@ def run_on_image(image_path, log_to_db=True):
             2
         )
 
-    cv2.imshow("FaceSense – Static", img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+        # --- SAVE PROCESSED IMAGE ---
+        base_dir = Path(__file__).resolve().parents[1]
+        processed_dir = base_dir / "storage" / "processed"
+        processed_dir.mkdir(parents=True, exist_ok=True)
 
+        input_name = Path(image_path).stem
+        output_path = processed_dir / f"{input_name}_processed.jpg"
 
-if __name__ == "__main__":
-    run_on_image("angryac.jpeg")
+        cv2.imwrite(str(output_path), img)
+        print(f"✅ Processed image saved to: {output_path}")
+
+        # --- OPTIONAL DISPLAY ---
+        if show:
+            cv2.imshow("FaceSense – Static", img)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+    if __name__ == "__main__":
+        run_on_image("facesense/storage/raw/angryac.jpeg")
