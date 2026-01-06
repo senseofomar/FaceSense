@@ -38,11 +38,14 @@ def main():
                 try:
                     emotion, confidence = analyze_emotion(face_roi)
                     last_emotion = emotion
+
+                    # No need to pass 'webcam' string anymore
                     log_emotion(
                         expression=emotion,
                         confidence=confidence,
-                        bbox=(x, y, x+w, y+h),
-                        session_id="webcam"
+                        bbox=(x, y, x + w, y + h)
+                        # session_id = "webcam"
+                        # session_ref_id will be auto-detected by db.py
                     )
                 except Exception:
                     pass
