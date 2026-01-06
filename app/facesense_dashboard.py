@@ -73,7 +73,6 @@ if app_mode == "📡 Live Monitor":
     col1, col2 = st.columns([1, 1.5])
 
     # 1. Create PLACEHOLDERS once.
-    # We will update these containers, not the whole page.
     with col1:
         st.subheader("Live Feed")
         live_image_spot = st.empty()
@@ -133,9 +132,8 @@ if app_mode == "📡 Live Monitor":
         # Sleep slightly to release CPU for sidebar interaction
         time.sleep(0.05)
 
-    # --- PAGE 2 & 3 (Static & History) ---
+    # --- PAGE 2 Static ---
 elif app_mode == "🖼️ Static Forensics":
-    # [Same code as before]
     st.title("🖼️ Static Image Forensics")
     st.markdown("Upload an image for deep-learning analysis.")
     uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
@@ -163,12 +161,74 @@ elif app_mode == "🖼️ Static Forensics":
                         st.progress(float(conf))
                     st.image(img_rgb, caption="Processed", use_container_width=True)
 
+# --- PAGE 3: HISTORY ---
 elif app_mode == "📂 Session History":
-    st.title("📂 Database Records")
+    st.title("📂 Session Analytics & Reports")
+
     try:
         conn = get_connection()
-        sessions = pd.read_sql("SELECT * FROM sessions ORDER BY id DESC LIMIT 20", conn)
-        conn.close()
-        st.dataframe(sessions, use_container_width=True)
+        # Fetch session list for the dropdown
+        sessions = pd.read_sql("SELECT id, session_name, start_time FROM sessions ORDER BY id DESC", conn)
+
+        if not sessions.empty:
+            # Create a dropdown to select a session
+            selected_session_name = st.selectbox("Select a Session to Analyze:",
+                                                 sessions['session_name'] + " (ID: " + sessions['id'].astype(str) + ")")
+
+            # Extract the ID from the string
+            selected_id = selected_session_name.split("ID: ")[1].replace(")", "")
+
+            if st.button("Generate Report"):
+                # Fetch data for this specific past session
+                history_df = pd.read_sql(
+                    "SELECT ts, expression, confidence FROM emotion_logs WHERE session_ref_id = %s ORDER BY ts ASC",
+                    conn,
+                    params=(selected_id,)
+                )
+
+                if not history_df.empty:
+                    # Metrics
+                    c1, c2, c3 = st.columns(3)
+                    dominant_emotion = history_df['expression'].mode()[0]
+                    avg_conf = history_df['confidence'].mean()
+
+                    # Fix for single-row duration bug
+                    if len(history_df) > 1:
+                        duration = (history_df['ts'].max() - history_df['ts'].min()).seconds
+                    else:
+                        duration = 0
+
+                    c1.metric("Dominant Emotion", dominant_emotion.upper())
+                    c2.metric("Average Confidence", f"{avg_conf * 100:.1f}%")
+                    c3.metric("Duration", f"{duration} seconds")
+
+                    # CSV Export
+                    csv = history_df.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="📥 Download Session Data (CSV)",
+                        data=csv,
+                        file_name=f"session_{selected_id}_report.csv",
+                        mime="text/csv",
+                    )
+
+                    # Chart
+                    st.markdown("### 📈 Emotion Timeline")
+                    history_chart = alt.Chart(history_df).mark_tick(thickness=3).encode(
+                        x=alt.X('ts:T', title='Time'),
+                        y=alt.Y('expression:N', title='Emotion'),
+                        color=alt.Color('expression:N', scale={"scheme": "category10"})
+                    ).properties(height=350).interactive()
+
+                    st.altair_chart(history_chart, use_container_width=True)
+
+                    with st.expander("View Raw Data Logs"):
+                        st.dataframe(history_df)
+                else:
+                    st.warning("No data found for this session.")
+            else:
+                st.info("No sessions found in database.")
+
+            conn.close()
+
     except Exception as e:
-        st.error("Database unavailable.")
+        st.error(f"Database Error: {e}")
