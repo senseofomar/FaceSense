@@ -4,6 +4,18 @@ from facesense.core.emotion import analyze_emotion
 from facesense.snapshots.snapshot import save_snapshot
 from facesense.storage.db import log_emotion
 
+# Define colors (BGR format for OpenCV)
+# We define this OUTSIDE the loop for efficiency
+COLORS = {
+    'angry': (0, 0, 255),    # Red
+    'happy': (0, 255, 255),  # Yellow
+    'sad': (255, 0, 0),      # Blue
+    'neutral': (0, 255, 0),  # Green
+    'surprise': (255, 255, 0), # Cyan
+    'fear': (128, 0, 128),   # Purple
+    'disgust': (0, 128, 0)   # Dark Green
+}
+
 def init_camera():
     cap = cv2.VideoCapture(1)
     if not cap.isOpened():
@@ -15,7 +27,7 @@ def init_camera():
 def main():
     cap = init_camera()
     frame_count = 0
-    last_emotion = ""
+    last_emotion = "neutral" # Default to avoid crashes
 
     print("🎥 Webcam started. Press 'q' to quit.")
 
@@ -50,26 +62,20 @@ def main():
                 except Exception:
                     pass
 
-            # Draw bounding box
-            cv2.rectangle(
-                frame,
-                (x, y),
-                (x + w, y + h),
-                (0, 255, 0),
-                2
-            )
+            # Draw Visuals
+            # Get color from dict, default to Green if not found
+            box_color = COLORS.get(last_emotion,
+                                   (0, 255, 0))
 
-            # Draw emotion label
-            if last_emotion:
-                cv2.putText(
-                    frame,
-                    last_emotion,
-                    (x, y - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.9,
-                    (0, 0, 255),
-                    2
-                )
+            cv2.rectangle(frame, (x, y), (x + w, y + h), box_color, 2)
+
+            # Add a background to text for readability
+            cv2.rectangle(frame, (x, y - 35), (x + w, y),
+                          box_color, -1)  # Filled box
+            cv2.putText(frame, last_emotion.upper(),
+                        (x, y - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8,
+                        (0, 0, 0), 2)  # Black text
 
         # Save snapshot for dashboard
         save_snapshot(frame)
