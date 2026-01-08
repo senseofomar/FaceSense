@@ -11,6 +11,10 @@ def detect_faces(frame):
     return _face_cascade.detectMultiScale(
         gray,
         scaleFactor=1.1,
-        minNeighbors=5,
-        minSize=(60, 60)
+        # INCREASED STRICTNESS:
+        # 5 -> 8 reduces "ghost" faces (shadows on neck/background)
+        minNeighbors=8,
+        # INCREASED SIZE:
+        # (60,60) -> (100,100) ignores small false positives
+        minSize=(100, 100)
     )
