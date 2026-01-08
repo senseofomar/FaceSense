@@ -1,28 +1,21 @@
 import cv2
 
-from collections import deque # this is to add buffer to emotion, stable feed
+import numpy as np
+import time
 
-import mediapipe as mp
+from collections import deque # this is to add buffer to emotion, stable feed
 
 from facesense.core.face_detector import detect_faces
 from facesense.core.emotion import analyze_emotion
 from facesense.snapshots.snapshot import save_snapshot
 from facesense.storage.db import log_emotion
 
-# --- MEDIAPIPE CONFIGURATION ---
-mp_face_mesh = mp.solutions.face_mesh
-mp_drawing = mp.solutions.drawing_utils
-mp_drawing_styles = mp.solutions.drawing_styles
-
-# Initialize Mesh (Lightweight mode)
-face_mesh = mp_face_mesh.FaceMesh(
-    max_num_faces=1,
-    refine_landmarks=True,
-    min_detection_confidence=0.5,
-    min_tracking_confidence=0.5
-)
-
 # Define colors (BGR format for OpenCV)
+COLOR_CYAN = (255, 255, 0)
+COLOR_GREEN = (0, 255, 0)
+COLOR_RED = (0, 0, 255)
+COLOR_WHITE = (255, 255, 255)
+
 # We define this OUTSIDE the loop for efficiency
 COLORS = {
     'angry': (0, 0, 255),    # Red
@@ -48,6 +41,42 @@ def get_dominant_emotion(buffer):
         return "neutral"
     return max(set(buffer), key=buffer.count)
 
+
+def draw_tech_ui(frame, x, y, w, h, color, scan_line_pos):
+    """Draws a Sci-Fi / Iron Man style HUD around the face"""
+
+    # 1. Corner Brackets (The "Targeting" look)
+    # Top-Left
+    cv2.line(frame, (x, y), (x + 20, y), color, 2)
+    cv2.line(frame, (x, y), (x, y + 20), color, 2)
+    # Top-Right
+    cv2.line(frame, (x + w, y), (x + w - 20, y), color, 2)
+    cv2.line(frame, (x + w, y), (x + w, y + 20), color, 2)
+    # Bottom-Left
+    cv2.line(frame, (x, y + h), (x + 20, y + h), color, 2)
+    cv2.line(frame, (x, y + h), (x, y + h - 20), color, 2)
+    # Bottom-Right
+    cv2.line(frame, (x + w, y + h), (x + w - 20, y + h), color, 2)
+    cv2.line(frame, (x + w, y + h), (x + w, y + h - 20), color, 2)
+
+    # 2. Scanning Laser Line (Moves up and down)
+    scan_y = y + int(scan_line_pos * h)
+    cv2.line(frame, (x, scan_y), (x + w, scan_y), (0, 255, 0), 2)
+    # Add a "glow" effect to the line
+    overlay = frame.copy()
+    cv2.line(overlay, (x, scan_y), (x + w, scan_y), (150, 255, 150), 4)
+    cv2.addWeighted(overlay, 0.3, frame, 0.7, 0, frame)
+
+    # 3. Tech Decorators (Dots and text)
+    # Center Point
+    cv2.circle(frame, (x + w // 2, y + h // 2), 2, COLOR_WHITE, -1)
+
+    # Side Data Block
+    cv2.putText(frame, f"ID: 0x{id(x) % 1000:03X}", (x + w + 5, y + 20),
+                cv2.FONT_HERSHEY_PLAIN, 1, color, 1)
+    cv2.putText(frame, f"TRK: {int(scan_line_pos * 100)}%", (x + w + 5, y + 40),
+                cv2.FONT_HERSHEY_PLAIN, 1, color, 1)
+
 def main():
     cap = init_camera()
     frame_count = 0
@@ -57,46 +86,33 @@ def main():
     emotion_window = deque(maxlen=7)
     current_stable_emotion = "neutral"
 
+    # Scanner animation variables
+    scan_pos = 0.0
+    scan_direction = 0.05
+
     print("🎥 Webcam started. Press 'q' to quit.")
 
     while True:
         ret, frame = cap.read()
         if not ret: break
 
-        # 1. Mirror and Convert for MediaPipe
+        # 1. Mirror
         frame = cv2.flip(frame, 1)
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame_count += 1
 
-        # 2. DRAW FACE MESH (The "Iron Man" Layer)
-        results = face_mesh.process(rgb_frame)
-        if results.multi_face_landmarks:
-            for face_landmarks in results.multi_face_landmarks:
-                # Draw the intricate mesh
-                mp_drawing.draw_landmarks(
-                    image=frame,
-                    landmark_list=face_landmarks,
-                    connections=mp_face_mesh.FACEMESH_TESSELATION,
-                    landmark_drawing_spec=None,
-                    connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_tesselation_style()
-                )
-                # Draw contours (Eyes/Lips/Face Shape) for sharper look
-                mp_drawing.draw_landmarks(
-                    image=frame,
-                    landmark_list=face_landmarks,
-                    connections=mp_face_mesh.FACEMESH_CONTOURS,
-                    landmark_drawing_spec=None,
-                    connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_contours_style()
-                )
+        # 2.The "Iron Man" Layer
+        scan_pos += scan_direction
+        if scan_pos >= 1.0 or scan_pos <= 0.0:
+            scan_direction *= -1
 
         # 3. EMOTION LOGIC
-        frame_count += 1
         faces = detect_faces(frame)
 
         for (x, y, w, h) in faces:
             # ROI for DeepFace (Logic Layer)
             face_roi = frame[y:y + h, x:x + w]
 
-            # Run emotion inference every 5 frames
+            # DeepFace Inference (Every 5 frames)
             if frame_count % 5 == 0:
                 try:
                     raw_emotion, confidence = analyze_emotion(face_roi)
@@ -118,7 +134,31 @@ def main():
                 except Exception:
                     pass
 
-            # 4. DRAW HUD (Heads-Up Display)
+    # 4.  --- DRAW THE SCI-FI HUD ---
+            # Use specific color for emotion
+            hud_color = COLORS.get(current_stable_emotion, COLOR_GREEN)
+
+            # Draw the custom tech UI (No MediaPipe needed!)
+            draw_tech_ui(frame, x, y, w, h, hud_color, scan_pos)
+
+            # Top Label (Solid Background for readability)
+            label = f"{current_stable_emotion.upper()}"
+            (text_w, text_h), _ = cv2.getTextSize(
+                label, cv2.FONT_HERSHEY_SIMPLEX,0.8,
+                2)
+
+            # Label Background
+            cv2.rectangle(frame, (x, y - 35),
+                          (x + text_w + 10, y),
+                          hud_color, -1)
+            # Label Text
+            cv2.putText(frame, label, (x + 5, y - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.8,
+                        (0, 0, 0), 2)
+
+            """
+            # DRAW HUD (Heads-Up Display)
             box_color = COLORS.get(current_stable_emotion,
                                    (0, 255, 0))
 
@@ -132,7 +172,7 @@ def main():
                         (x + 10, y - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8,
                         (0, 0, 0), 2)  # Black text
-
+            """
         # Save snapshot for dashboard
         save_snapshot(frame)
 
