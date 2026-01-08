@@ -1,10 +1,6 @@
 import cv2
-
-import numpy as np
-import time
-
 from collections import deque # this is to add buffer to emotion, stable feed
-
+import time
 from facesense.core.face_detector import detect_faces
 from facesense.core.emotion import analyze_emotion
 from facesense.snapshots.snapshot import save_snapshot
@@ -42,40 +38,63 @@ def get_dominant_emotion(buffer):
     return max(set(buffer), key=buffer.count)
 
 
-def draw_tech_ui(frame, x, y, w, h, color, scan_line_pos):
-    """Draws a Sci-Fi / Iron Man style HUD around the face"""
+def draw_hud(frame, x, y, w, h, color, scan_line_pos, emotion, confidence):
+    """Draws a Sci-Fi / Iron Man style HUD around the face + confidence bar"""
 
-    # 1. Corner Brackets (The "Targeting" look)
-    # Top-Left
-    cv2.line(frame, (x, y), (x + 20, y), color, 2)
-    cv2.line(frame, (x, y), (x, y + 20), color, 2)
-    # Top-Right
-    cv2.line(frame, (x + w, y), (x + w - 20, y), color, 2)
-    cv2.line(frame, (x + w, y), (x + w, y + 20), color, 2)
-    # Bottom-Left
-    cv2.line(frame, (x, y + h), (x + 20, y + h), color, 2)
-    cv2.line(frame, (x, y + h), (x, y + h - 20), color, 2)
-    # Bottom-Right
-    cv2.line(frame, (x + w, y + h), (x + w - 20, y + h), color, 2)
-    cv2.line(frame, (x + w, y + h), (x + w, y + h - 20), color, 2)
+    # 1. Corner Brackets
+    len_line = int(w * 0.15)
+    thick = 2
+
+    # Corners
+    cv2.line(frame, (x, y), (x + len_line, y), color, thick)
+    cv2.line(frame, (x, y), (x, y + len_line), color, thick)
+    cv2.line(frame, (x + w, y), (x + w - len_line, y), color, thick)
+    cv2.line(frame, (x + w, y), (x + w, y + len_line), color, thick)
+    cv2.line(frame, (x, y + h), (x + len_line, y + h), color, thick)
+    cv2.line(frame, (x, y + h), (x, y + h - len_line), color, thick)
+    cv2.line(frame, (x + w, y + h), (x + w - len_line, y + h), color, thick)
+    cv2.line(frame, (x + w, y + h), (x + w, y + h - len_line), color, thick)
 
     # 2. Scanning Laser Line (Moves up and down)
     scan_y = y + int(scan_line_pos * h)
-    cv2.line(frame, (x, scan_y), (x + w, scan_y), (0, 255, 0), 2)
-    # Add a "glow" effect to the line
-    overlay = frame.copy()
-    cv2.line(overlay, (x, scan_y), (x + w, scan_y), (150, 255, 150), 4)
-    cv2.addWeighted(overlay, 0.3, frame, 0.7, 0, frame)
+    cv2.line(frame, (x, scan_y), (x + w, scan_y),
+             (0, 255, 0), 2)
 
-    # 3. Tech Decorators (Dots and text)
-    # Center Point
+    # 3. CONFIDENCE BAR (The "Health Bar")
+    # Background (Gray)
+    bar_x = x
+    bar_y = y - 15
+    bar_h = 5
+    cv2.rectangle(frame, (bar_x, bar_y), (bar_x + w, bar_y + bar_h), (50, 50, 50), -1)
+    # Foreground (Color fill based on confidence)
+    fill_width = int(w * confidence)
+    cv2.rectangle(frame, (bar_x, bar_y),
+                  (bar_x + fill_width, bar_y + bar_h), color, -1)
+
+    # 4. Decorators
     cv2.circle(frame, (x + w // 2, y + h // 2), 2, COLOR_WHITE, -1)
-
-    # Side Data Block
     cv2.putText(frame, f"ID: 0x{id(x) % 1000:03X}", (x + w + 5, y + 20),
                 cv2.FONT_HERSHEY_PLAIN, 1, color, 1)
-    cv2.putText(frame, f"TRK: {int(scan_line_pos * 100)}%", (x + w + 5, y + 40),
+    cv2.putText(frame, f"CNF: {int(confidence * 100)}%", (x + w + 5, y + 40),
                 cv2.FONT_HERSHEY_PLAIN, 1, color, 1)
+
+
+def draw_system_stats(frame, fps):
+    """Draws FPS and System Status in Top-Left"""
+    # Background box
+    cv2.rectangle(frame, (10, 10), (230, 90), (0, 0, 0), -1)
+    cv2.rectangle(frame, (10, 10), (230, 90), (0, 255, 0), 1)
+
+    # Text
+    cv2.putText(frame, "SYSTEM: ONLINE",
+                (25, 35), cv2.FONT_HERSHEY_PLAIN,
+                1.2, (0, 255, 0), 1)
+    cv2.putText(frame, f"FPS: {int(fps)}",
+                (25, 55), cv2.FONT_HERSHEY_PLAIN,
+                1.2, (0, 255, 255), 1)
+    cv2.putText(frame, "DB LOG: ACTIVE",
+                (25, 75), cv2.FONT_HERSHEY_PLAIN,
+                1.2, (0, 150, 255), 1)
 
 def main():
     cap = init_camera()
@@ -85,10 +104,14 @@ def main():
     # Stores the last 7 emotions to prevent flickering
     emotion_window = deque(maxlen=7)
     current_stable_emotion = "neutral"
+    current_confidence = 0.0
 
     # Scanner animation variables
     scan_pos = 0.0
     scan_direction = 0.05
+
+    # FPS Calculation
+    prev_time = 0
 
     print("🎥 Webcam started. Press 'q' to quit.")
 
@@ -99,6 +122,11 @@ def main():
         # 1. Mirror
         frame = cv2.flip(frame, 1)
         frame_count += 1
+
+        # Calculate FPS
+        curr_time = time.time()
+        fps = 1 / (curr_time - prev_time) if prev_time > 0 else 0
+        prev_time = curr_time
 
         # 2.The "Iron Man" Layer
         scan_pos += scan_direction
@@ -115,7 +143,7 @@ def main():
             # DeepFace Inference (Every 5 frames)
             if frame_count % 5 == 0:
                 try:
-                    raw_emotion, confidence = analyze_emotion(face_roi)
+                    raw_emotion, conf = analyze_emotion(face_roi)
 
                     # Add raw prediction to the buffer
                     emotion_window.append(raw_emotion)
@@ -123,10 +151,12 @@ def main():
                     # CALCULATE STABLE EMOTION (The "Vote")
                     current_stable_emotion = get_dominant_emotion(emotion_window)
 
+                    # Storing Confidence
+                    current_confidence = conf
                     # No need to pass 'webcam' string anymore
                     log_emotion(
                         expression=current_stable_emotion,
-                        confidence=confidence,
+                        confidence=conf,
                         bbox=(x, y, x + w, y + h)
                         # session_id = "webcam"
                         # session_ref_id will be auto-detected by db.py
@@ -134,12 +164,18 @@ def main():
                 except Exception:
                     pass
 
-    # 4.  --- DRAW THE SCI-FI HUD ---
-            # Use specific color for emotion
+            # --- DRAWING LOGIC ---
             hud_color = COLORS.get(current_stable_emotion, COLOR_GREEN)
 
-            # Draw the custom tech UI (No MediaPipe needed!)
-            draw_tech_ui(frame, x, y, w, h, hud_color, scan_pos)
+            # FLASH EFFECT: If very confident, flash white
+            if current_confidence > 0.90:
+                draw_color = COLOR_WHITE
+            else:
+                draw_color = hud_color
+
+            # Draw the HUD Bar
+            draw_hud(frame, x, y, w, h, draw_color, scan_pos,
+                     current_stable_emotion, current_confidence)
 
             # Top Label (Solid Background for readability)
             label = f"{current_stable_emotion.upper()}"
@@ -149,33 +185,18 @@ def main():
 
             # Label Background
             cv2.rectangle(frame, (x, y - 35),
-                          (x + text_w + 10, y),
-                          hud_color, -1)
+                          (x + text_w + 10, y), hud_color, -1)
             # Label Text
             cv2.putText(frame, label, (x + 5, y - 10),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.8,
                         (0, 0, 0), 2)
 
-            """
-            # DRAW HUD (Heads-Up Display)
-            box_color = COLORS.get(current_stable_emotion,
-                                   (0, 255, 0))
+        # Draw System Stats Overlay (New Feature)
+        draw_system_stats(frame, fps)
 
-            # Bounding Box with "Corners" look
-            cv2.rectangle(frame, (x, y), (x + w, y + h), box_color, 2)
-
-            # Top Label (Emotion)
-            cv2.rectangle(frame, (x, y -40), (x + w, y),
-                          box_color, -1)  # Filled box
-            cv2.putText(frame, f"{current_stable_emotion.upper()}",
-                        (x + 10, y - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8,
-                        (0, 0, 0), 2)  # Black text
-            """
         # Save snapshot for dashboard
         save_snapshot(frame)
-
         cv2.imshow("FaceSense – Live (Mirror View)", frame)
 
         if cv2.waitKey(1) & 0xFF == ord("q"):
