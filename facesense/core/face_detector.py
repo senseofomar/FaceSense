@@ -13,7 +13,7 @@ def detect_faces(frame):
         scaleFactor=1.1,
         # INCREASED STRICTNESS:
         # 5 -> 8 reduces "ghost" faces (shadows on neck/background)
-        minNeighbors=7,
+        minNeighbors=4,
         # INCREASED SIZE:
         # (60,60) -> (100,100) ignores small false positives
         minSize=(70, 70)
