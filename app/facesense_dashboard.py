@@ -17,10 +17,36 @@ sys.path.append(parent_dir)
 from facesense.storage.db import create_session, end_active_session, get_active_session, get_connection
 from facesense.core.face_detector import detect_faces
 
+# --- UI POLISH ---
+def apply_custom_css():
+    st.markdown("""
+        <style>
+        /* Card-like styling for metrics */
+        div[data-testid="stMetric"] {
+            background-color: #1E1E1E;
+            border: 1px solid #333;
+            padding: 15px;
+            border-radius: 10px;
+            color: white;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+        }
+        /* Make the charts pop */
+        canvas {
+            border-radius: 10px;
+        }
+        /* Custom sidebar styling */
+        section[data-testid="stSidebar"] {
+            background-color: #111;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+
 # --- CONFIG ---
 st.set_page_config(page_title="FaceSense AI", layout="wide", page_icon="🧠")
 SNAPSHOT_PATH = os.path.join(os.getcwd(), "snapshots", "last_frame.jpg")
 
+apply_custom_css()
 
 # --- HELPER FUNCTIONS ---
 
