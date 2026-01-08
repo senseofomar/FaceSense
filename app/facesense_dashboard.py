@@ -50,18 +50,38 @@ apply_custom_css()
 
 # --- HELPER FUNCTIONS ---
 
-# REMOVED @st.cache_data for this specific function.
-# Caching prevents real-time 30FPS playback because it holds old frames.
+# Global variable to store the last successful frame
+# This acts as a "Video Buffer" so the screen never goes black
+_last_valid_frame = None
+
+
 def load_last_snapshot(path=SNAPSHOT_PATH):
-    if not os.path.exists(path): return None
-    try:
-        # Use simple file read - OS handles buffering efficiently
-        img = cv2.imread(path)
-        if img is None: return None
-        return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    except:
+    global _last_valid_frame
+
+    # 1. Check if file exists
+    if not os.path.exists(path):
+        # If file is missing but we have a backup in memory, show the backup
+        if _last_valid_frame is not None:
+            return _last_valid_frame
         return None
 
+    # 2. Try to read (with Retries for Windows locking)
+    for _ in range(3):  # Try 3 times before giving up
+        try:
+            img = cv2.imread(path)
+            if img is not None:
+                # Success! Update our memory backup
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                _last_valid_frame = img
+                return img
+        except:
+            pass
+
+        # Wait a tiny bit before trying again (let live.py finish writing)
+        time.sleep(0.01)
+
+    # 3. If all reads failed, return the memory backup (Prevent Flicker)
+    return _last_valid_frame
 
 def get_session_data(session_id):
     conn = get_connection()
