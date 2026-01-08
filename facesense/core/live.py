@@ -1,4 +1,5 @@
 import cv2
+from collections import deque # this is to add buffer to emotion, stable feed
 from facesense.core.face_detector import detect_faces
 from facesense.core.emotion import analyze_emotion
 from facesense.snapshots.snapshot import save_snapshot
@@ -24,10 +25,20 @@ def init_camera():
         raise IOError("Cannot open webcam")
     return cap
 
+def get_dominant_emotion(buffer):
+    """Returns the most frequent emotion in the buffer (Stabilization)"""
+    if not buffer:
+        return "neutral"
+    return max(set(buffer), key=buffer.count)
+
 def main():
     cap = init_camera()
     frame_count = 0
-    last_emotion = "neutral" # Default to avoid crashes
+
+    # --- STABILIZATION BUFFER ---
+    # Stores the last 7 emotions to prevent flickering
+    emotion_window = deque(maxlen=7)
+    current_stable_emotion = "neutral"
 
     print("🎥 Webcam started. Press 'q' to quit.")
 
@@ -48,12 +59,17 @@ def main():
             # Run emotion inference every 5 frames
             if frame_count % 5 == 0:
                 try:
-                    emotion, confidence = analyze_emotion(face_roi)
-                    last_emotion = emotion
+                    raw_emotion, confidence = analyze_emotion(face_roi)
+
+                    # Add raw prediction to the buffer
+                    emotion_window.append(raw_emotion)
+
+                    # CALCULATE STABLE EMOTION (The "Vote")
+                    current_stable_emotion = get_dominant_emotion(emotion_window)
 
                     # No need to pass 'webcam' string anymore
                     log_emotion(
-                        expression=emotion,
+                        expression=current_stable_emotion,
                         confidence=confidence,
                         bbox=(x, y, x + w, y + h)
                         # session_id = "webcam"
@@ -64,7 +80,7 @@ def main():
 
             # Draw Visuals
             # Get color from dict, default to Green if not found
-            box_color = COLORS.get(last_emotion,
+            box_color = COLORS.get(current_stable_emotion,
                                    (0, 255, 0))
 
             cv2.rectangle(frame, (x, y), (x + w, y + h), box_color, 2)
@@ -72,7 +88,7 @@ def main():
             # Add a background to text for readability
             cv2.rectangle(frame, (x, y - 35), (x + w, y),
                           box_color, -1)  # Filled box
-            cv2.putText(frame, last_emotion.upper(),
+            cv2.putText(frame, current_stable_emotion.upper(),
                         (x, y - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8,
                         (0, 0, 0), 2)  # Black text
