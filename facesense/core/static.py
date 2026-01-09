@@ -28,7 +28,6 @@ def run_on_image(image_path, show = True, log_to_db=True):
                 expression=emotion,
                 confidence=confidence,
                 bbox=(x, y, x+w, y+h),
-                session_id="static"
             )
 
         cv2.rectangle(img, (x,y), (x+w,y+h), (0,255,0), 2)
@@ -60,4 +59,4 @@ def run_on_image(image_path, show = True, log_to_db=True):
         cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    run_on_image("facesense/storage/raw/angryac.jpeg")
+    run_on_image("facesense/storage/raw/gg.png")

@@ -33,6 +33,16 @@ Imagine installing this system in a **Movie Theater**, where instead of relying 
 - **Remote Monitoring:** Access live webcam feeds from the dashboard interface.
 
 ---
+## 🔍 Static Image Forensics
+![Static Forensics](assets/facesense_ui_1_16x9.png)
+
+## 🎥 Live Emotion Analysis
+![Live Monitor](assets/facesense_ui_2_16x9.png)
+
+## 📊 Session Analytics & Reports
+![Session Analytics](assets/facesense_ui_3_16x9.png)
+
+
 
 ## 🛠️ Tech Stack
 - **Programming Language:** Python 3.x
@@ -137,3 +147,5 @@ We welcome your ideas and feedback! If you have suggestions for additional use c
 
 ## 👤 Author
 This project is developed and maintained by **senseofomar**. For any queries, please reach out via the repository.
+
+

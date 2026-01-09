@@ -17,6 +17,7 @@ sys.path.append(parent_dir)
 from facesense.storage.db import create_session, end_active_session, get_active_session, get_connection
 from facesense.core.face_detector import detect_faces
 
+
 # --- UI POLISH ---
 def apply_custom_css():
     st.markdown("""
@@ -25,14 +26,15 @@ def apply_custom_css():
         div[data-testid="stMetric"] {
             background-color: #1E1E1E;
             border: 1px solid #333;
-            padding: 15px;
+            padding: 10px;
             border-radius: 10px;
             color: white;
             box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
         }
-        /* Make the charts pop */
-        canvas {
-            border-radius: 10px;
+        /* Tighter padding for main container */
+        .block-container {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
         }
         /* Custom sidebar styling */
         section[data-testid="stSidebar"] {
@@ -51,7 +53,6 @@ apply_custom_css()
 # --- HELPER FUNCTIONS ---
 
 # Global variable to store the last successful frame
-# This acts as a "Video Buffer" so the screen never goes black
 _last_valid_frame = None
 
 
@@ -60,28 +61,24 @@ def load_last_snapshot(path=SNAPSHOT_PATH):
 
     # 1. Check if file exists
     if not os.path.exists(path):
-        # If file is missing but we have a backup in memory, show the backup
         if _last_valid_frame is not None:
             return _last_valid_frame
         return None
 
-    # 2. Try to read (with Retries for Windows locking)
-    for _ in range(3):  # Try 3 times before giving up
+    # 2. Try to read (with Retries)
+    for _ in range(3):
         try:
             img = cv2.imread(path)
             if img is not None:
-                # Success! Update our memory backup
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 _last_valid_frame = img
                 return img
         except:
             pass
-
-        # Wait a tiny bit before trying again (let live.py finish writing)
         time.sleep(0.01)
 
-    # 3. If all reads failed, return the memory backup (Prevent Flicker)
     return _last_valid_frame
+
 
 def get_session_data(session_id):
     conn = get_connection()
@@ -116,9 +113,9 @@ else:
 if app_mode == "📡 Live Monitor":
     st.title("📡 Live Analysis Monitor")
 
-    col1, col2 = st.columns([1, 1.5])
+    # LAYOUT ADJUSTMENT: Video gets more space (Ratio 2:1)
+    col1, col2 = st.columns([2, 1])
 
-    # 1. Create PLACEHOLDERS once.
     with col1:
         st.subheader("Live Feed")
         live_image_spot = st.empty()
@@ -128,15 +125,11 @@ if app_mode == "📡 Live Monitor":
         metrics_spot = st.empty()
         chart_spot = st.empty()
 
-    # 2. THE SMOOTH LOOP
-    # This loop keeps running to update the image fast,
-    # but only fetches DB data occasionally.
-
     last_db_update = 0
-    DB_UPDATE_INTERVAL = 1.0  # Update graph every 1 second
+    DB_UPDATE_INTERVAL = 1.0
 
     while True:
-        # A. FAST UPDATE: Camera Feed (Every 0.05s)
+        # A. FAST UPDATE
         img = load_last_snapshot()
         if img is not None:
             live_image_spot.image(img, use_container_width=True,
@@ -144,104 +137,101 @@ if app_mode == "📡 Live Monitor":
         else:
             live_image_spot.warning("Waiting for camera source...")
 
-        # B. SLOW UPDATE: Database & Graph (Every 1.0s)
-        # We throttle this to prevent UI freezing and DB overload
+        # B. SLOW UPDATE
         if time.time() - last_db_update > DB_UPDATE_INTERVAL:
             if active_session:
                 df = get_session_data(active_session[0])
                 if not df.empty:
                     last = df.iloc[-1]
 
-                    # Update Metrics
                     with metrics_spot.container():
-                        m1, m2, m3 = st.columns(3)
+                        # Stack metrics vertically to save width in the narrower column
+                        m1, m2 = st.columns(2)
                         m1.metric("Emotion", last['expression'].upper())
                         m2.metric("Confidence", f"{float(last['confidence']) * 100:.1f}%")
-                        m3.metric("Data Points", len(df))
 
-                    # Update Chart
                     chart = alt.Chart(df).mark_tick(thickness=3).encode(
                         x=alt.X('ts:T', title='Time', axis=alt.Axis(format='%H:%M:%S')),
                         y=alt.Y('expression:N', title='Emotion'),
                         color=alt.Color('expression:N', scale={"scheme": "category10"}),
-                    ).properties(height=350, title="Emotion Timeline")
+                    ).properties(height=250, title="Emotion Timeline")  # Reduced chart height slightly
                     chart_spot.altair_chart(chart, use_container_width=True)
                 else:
                     metrics_spot.info("Waiting for first detection...")
             else:
                 metrics_spot.markdown("### 💤 System Idle")
-                metrics_spot.write("Start a session in the sidebar to begin data logging.")
+                metrics_spot.write("Start a session in sidebar.")
 
-            last_db_update = time.time()  # Reset timer
-
-        # C. CONTROL FRAME RATE
-        # Sleep slightly to release CPU for sidebar interaction
+            last_db_update = time.time()
         time.sleep(0.05)
 
-    # --- PAGE 2 Static ---
+# --- PAGE 2: STATIC FORENSICS (High Accuracy + Compact View) ---
 elif app_mode == "🖼️ Static Forensics":
     st.title("🖼️ Static Image Forensics")
     st.markdown("Upload an image for deep-learning analysis.")
-    # 1. File Uploader
+
     uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
     if uploaded_file is not None:
-        # Convert file to OpenCV format
         file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
         img_bgr = cv2.imdecode(file_bytes, 1)
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 
-        # --- RESIZING LOGIC (Fixes "Way too big") ---
-        # Resize image to a manageable height (e.g., 400px) while keeping aspect ratio
-        height, width = img_rgb.shape[:2]
-        max_height = 400
-        if height > max_height:
-            scale_factor = max_height / height
-            new_width = int(width * scale_factor)
-            img_rgb = cv2.resize(img_rgb, (new_width, max_height))
-            img_bgr = cv2.resize(img_bgr, (new_width, max_height))
-        # ---------------------------------------------
 
-        # Create the containers for side-by-side view
+        # --- PREPARE DISPLAY VERSIONS ---
+        # We process the FULL SIZE image for accuracy,
+        # but we display a RESIZED version for UI compactness.
+
+        def resize_for_display(img, max_h=300):  # Increased slightly to 300 for clarity
+            h, w = img.shape[:2]
+            if h > max_h:
+                scale = max_h / h
+                return cv2.resize(img, (int(w * scale), max_h))
+            return img
+
+
+        # Show Original (Resized for Display Only)
         col1, col2 = st.columns([1, 1])
-
-        # Show Original in Col 1 immediately
         with col1:
-            st.markdown("### Original")  # Using markdown headers for cleaner look
-            st.image(img_rgb, use_container_width=True)
+            st.markdown("### Original")
+            st.image(resize_for_display(img_rgb), use_container_width=False)
 
-        # 2. Analyze Button (Placed clearly to not shift layout)
+        # Analyze Button
         analyze_clicked = st.button("🔍 Analyze Expression", type="primary", use_container_width=True)
 
         if analyze_clicked:
-            with st.spinner("Processing..."):
+            with st.spinner("Processing High-Res Image..."):
                 from facesense.core.emotion import analyze_emotion
 
-                # Process the image
+                # 1. DETECT on the ORIGINAL HUGE IMAGE (High Accuracy)
                 faces = detect_faces(img_bgr)
-                processed_img = img_rgb.copy()  # Work on a copy
+                processed_img = img_rgb.copy()
 
                 if len(faces) > 0:
                     for (x, y, w, h) in faces:
+                        # Extract from original high-res image
                         face_roi = img_bgr[y:y + h, x:x + w]
                         emotion, conf = analyze_emotion(face_roi)
 
-                        # Draw Box & Text
-                        color = (0, 255, 0)  # Green
-                        cv2.rectangle(processed_img, (x, y), (x + w, y + h), color, 2)
+                        # Draw on original high-res image
+                        color = (0, 255, 0)
+                        cv2.rectangle(processed_img, (x, y), (x + w, y + h), color, 4)  # Thicker line for high-res
 
-                        # Label Background for readability
-                        label = f"{emotion.upper()} ({int(conf * 100)}%)"
-                        (text_w, text_h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-                        cv2.rectangle(processed_img, (x, y - 20), (x + text_w, y), color, -1)
-                        cv2.putText(processed_img, label, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+                        label = f"{emotion.upper()}"
+                        # Scale font size based on image width so it's readable on big images
+                        font_scale = max(0.8, processed_img.shape[1] / 1000.0)
+                        thickness = max(2, int(font_scale * 2))
 
-                    # Show Result in Col 2
+                        (text_w, text_h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
+                        cv2.rectangle(processed_img, (x, y - int(text_h * 1.5)), (x + text_w, y), color, -1)
+                        cv2.putText(processed_img, label, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0),
+                                    thickness)
+
+                    # 2. RESIZE the FINAL RESULT for Display
                     with col2:
                         st.markdown("### Processed")
-                        st.image(processed_img, use_container_width=True)
-                        st.success(f"Detected: **{emotion.upper()}**")
-
+                        st.image(resize_for_display(processed_img), use_container_width=False)
+                        st.success(f"Detected {len(faces)} face(s).")
                 else:
                     with col2:
                         st.warning("No faces detected.")
@@ -252,32 +242,23 @@ elif app_mode == "📂 Session History":
 
     try:
         conn = get_connection()
-        # Fetch session list for the dropdown
         sessions = pd.read_sql("SELECT id, session_name, start_time FROM sessions ORDER BY id DESC", conn)
 
         if not sessions.empty:
-            # Create a dropdown to select a session
             selected_session_name = st.selectbox("Select a Session to Analyze:",
                                                  sessions['session_name'] + " (ID: " + sessions['id'].astype(str) + ")")
-
-            # Extract the ID from the string
             selected_id = selected_session_name.split("ID: ")[1].replace(")", "")
 
             if st.button("Generate Report"):
-                # Fetch data for this specific past session
                 history_df = pd.read_sql(
                     "SELECT ts, expression, confidence FROM emotion_logs WHERE session_ref_id = %s ORDER BY ts ASC",
-                    conn,
-                    params=(selected_id,)
+                    conn, params=(selected_id,)
                 )
 
                 if not history_df.empty:
-                    # Metrics
                     c1, c2, c3 = st.columns(3)
                     dominant_emotion = history_df['expression'].mode()[0]
                     avg_conf = history_df['confidence'].mean()
-
-                    # Fix for single-row duration bug
                     if len(history_df) > 1:
                         duration = (history_df['ts'].max() - history_df['ts'].min()).seconds
                     else:
@@ -287,33 +268,22 @@ elif app_mode == "📂 Session History":
                     c2.metric("Average Confidence", f"{avg_conf * 100:.1f}%")
                     c3.metric("Duration", f"{duration} seconds")
 
-                    # CSV Export
                     csv = history_df.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label="📥 Download Session Data (CSV)",
-                        data=csv,
-                        file_name=f"session_{selected_id}_report.csv",
-                        mime="text/csv",
-                    )
+                    st.download_button("📥 Download CSV", csv, f"session_{selected_id}.csv", "text/csv")
 
-                    # Chart
                     st.markdown("### 📈 Emotion Timeline")
                     history_chart = alt.Chart(history_df).mark_tick(thickness=3).encode(
                         x=alt.X('ts:T', title='Time'),
                         y=alt.Y('expression:N', title='Emotion'),
                         color=alt.Color('expression:N', scale={"scheme": "category10"})
                     ).properties(height=350).interactive()
-
                     st.altair_chart(history_chart, use_container_width=True)
-
-                    with st.expander("View Raw Data Logs"):
+                    with st.expander("View Logs"):
                         st.dataframe(history_df)
                 else:
-                    st.warning("No data found for this session.")
+                    st.warning("No data found.")
             else:
-                st.info("No sessions found in database.")
-
+                st.info("No sessions found.")
             conn.close()
-
     except Exception as e:
         st.error(f"Database Error: {e}")
