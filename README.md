@@ -51,8 +51,7 @@ Imagine installing this system in a **Movie Theater**. Instead of relying on wri
 
 git clone [https://github.com/senseofomar/FaceSense.git](https://github.com/senseofomar/FaceSense.git)
 
-2. Set up Virtual Environment
-3. 
+2. Set up Virtual Environment 
 python -m venv .venv
 # Windows
 .venv\Scripts\activate
@@ -87,9 +86,6 @@ CREATE TABLE emotion_logs (
 5. Configure Database Connection
 
 Update the facesense/storage/db.py file with your MySQL credentials:
-
-Python
-
 def get_connection():
     return mysql.connector.connect(
         host="localhost",
@@ -97,6 +93,7 @@ def get_connection():
         password="your_password",
         database="facesense_db"
     )
+    
 🖥️ Usage
 Step 1: Start the Dashboard
 This controls the session recording.
