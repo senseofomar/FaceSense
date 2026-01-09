@@ -48,25 +48,24 @@ Imagine installing this system in a **Movie Theater**. Instead of relying on wri
 ## ⚙️ Installation
 
 ### 1. Clone the Repository
-```bash
-git clone [https://github.com/senseofomar/FaceSense.git](https://github.com/senseofomar/FaceSense.git)
-cd FaceSense
-2. Set up Virtual Environment
-Bash
 
+git clone [https://github.com/senseofomar/FaceSense.git](https://github.com/senseofomar/FaceSense.git)
+
+2. Set up Virtual Environment
+3. 
 python -m venv .venv
 # Windows
 .venv\Scripts\activate
 # Mac/Linux
 source .venv/bin/activate
+
 3. Install Dependencies
-Bash
 
 pip install -r requirements.txt
-4. Database Setup (MySQL)
-Create a database named facesense_db and run the following SQL commands:
 
-SQL
+4. Database Setup (MySQL)
+
+Create a database named facesense_db and run the following SQL commands:
 
 CREATE TABLE sessions (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -84,7 +83,9 @@ CREATE TABLE emotion_logs (
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (session_ref_id) REFERENCES sessions(id)
 );
+
 5. Configure Database Connection
+
 Update the facesense/storage/db.py file with your MySQL credentials:
 
 Python
@@ -99,15 +100,10 @@ def get_connection():
 🖥️ Usage
 Step 1: Start the Dashboard
 This controls the session recording.
-
-Bash
-
 streamlit run app/facesense_dashboard.py
+
 Step 2: Start the Camera Feed
 This runs the AI inference.
-
-Bash
-
 python facesense/apps/live.py
 Press 'q' to quit the camera.
 
