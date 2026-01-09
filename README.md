@@ -51,3 +51,74 @@ Imagine installing this system in a **Movie Theater**. Instead of relying on wri
 ```bash
 git clone [https://github.com/senseofomar/FaceSense.git](https://github.com/senseofomar/FaceSense.git)
 cd FaceSense
+2. Set up Virtual Environment
+Bash
+
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# Mac/Linux
+source .venv/bin/activate
+3. Install Dependencies
+Bash
+
+pip install -r requirements.txt
+4. Database Setup (MySQL)
+Create a database named facesense_db and run the following SQL commands:
+
+SQL
+
+CREATE TABLE sessions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    session_name VARCHAR(255),
+    start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT 1
+);
+
+CREATE TABLE emotion_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    session_ref_id INT,
+    expression VARCHAR(50),
+    confidence FLOAT,
+    x1 INT, y1 INT, x2 INT, y2 INT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_ref_id) REFERENCES sessions(id)
+);
+5. Configure Database Connection
+Update the facesense/storage/db.py file with your MySQL credentials:
+
+Python
+
+def get_connection():
+    return mysql.connector.connect(
+        host="localhost",
+        user="your_user",
+        password="your_password",
+        database="facesense_db"
+    )
+🖥️ Usage
+Step 1: Start the Dashboard
+This controls the session recording.
+
+Bash
+
+streamlit run app/facesense_dashboard.py
+Step 2: Start the Camera Feed
+This runs the AI inference.
+
+Bash
+
+python facesense/apps/live.py
+Press 'q' to quit the camera.
+
+Status Indicator: Watch the "LOGS" text in the top-left. It will switch from IDLE (Gray) to ACTIVE (Red) when you start a session on the dashboard.
+
+🧠 Engineering Challenges Solved
+Ghost Face Detection: Haar Cascades often detect shadows on the neck as faces. I implemented a size-filtering logic that dynamically assesses all detected rectangles and discards non-primary faces.
+
+File Locking (Race Condition): The dashboard tries to read the latest frame while the camera writes it. I implemented a Retry-with-Fallback mechanism to ensure the video feed remains smooth (30 FPS) without crashing due to Windows file access errors.
+
+🤝 Contributing
+Open to feedback! If you have ideas for other use cases (retail analysis, online education monitoring, etc.), feel free to open an issue or pull request.
+
+Author: senseofomar
