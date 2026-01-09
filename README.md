@@ -34,13 +34,13 @@ Imagine installing this system in a **Movie Theater**, where instead of relying 
 
 ---
 ## 🔍 Static Image Forensics
-![Static Forensics](assets/facesense_ui_1_16x9.png)
+![Static Forensics](facesense/assets/facesense_ui_1_16x9.png)
 
 ## 🎥 Live Emotion Analysis
-![Live Monitor](assets/facesense_ui_2_16x9.png)
+![Live Monitor](facesense/assets/facesense_ui_2_16x9.png)
 
 ## 📊 Session Analytics & Reports
-![Session Analytics](assets/facesense_ui_3_16x9.png)
+![Session Analytics](facesense/assets/facesense_ui_3_16x9.png)
 
 
 
