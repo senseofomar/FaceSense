@@ -182,30 +182,69 @@ if app_mode == "📡 Live Monitor":
 elif app_mode == "🖼️ Static Forensics":
     st.title("🖼️ Static Image Forensics")
     st.markdown("Upload an image for deep-learning analysis.")
+    # 1. File Uploader
     uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+
     if uploaded_file is not None:
+        # Convert file to OpenCV format
         file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
         img_bgr = cv2.imdecode(file_bytes, 1)
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-        c1, c2 = st.columns(2)
-        with c1:
-            st.image(img_rgb, caption="Original", use_container_width=True)
-        with c2:
-            if st.button("Analyze Expression"):
-                with st.spinner("Processing..."):
-                    from facesense.core.emotion import analyze_emotion
 
-                    faces = detect_faces(img_bgr)
-                    st.success(f"Detected {len(faces)} face(s)")
+        # --- RESIZING LOGIC (Fixes "Way too big") ---
+        # Resize image to a manageable height (e.g., 400px) while keeping aspect ratio
+        height, width = img_rgb.shape[:2]
+        max_height = 400
+        if height > max_height:
+            scale_factor = max_height / height
+            new_width = int(width * scale_factor)
+            img_rgb = cv2.resize(img_rgb, (new_width, max_height))
+            img_bgr = cv2.resize(img_bgr, (new_width, max_height))
+        # ---------------------------------------------
+
+        # Create the containers for side-by-side view
+        col1, col2 = st.columns([1, 1])
+
+        # Show Original in Col 1 immediately
+        with col1:
+            st.markdown("### Original")  # Using markdown headers for cleaner look
+            st.image(img_rgb, use_container_width=True)
+
+        # 2. Analyze Button (Placed clearly to not shift layout)
+        analyze_clicked = st.button("🔍 Analyze Expression", type="primary", use_container_width=True)
+
+        if analyze_clicked:
+            with st.spinner("Processing..."):
+                from facesense.core.emotion import analyze_emotion
+
+                # Process the image
+                faces = detect_faces(img_bgr)
+                processed_img = img_rgb.copy()  # Work on a copy
+
+                if len(faces) > 0:
                     for (x, y, w, h) in faces:
                         face_roi = img_bgr[y:y + h, x:x + w]
                         emotion, conf = analyze_emotion(face_roi)
-                        cv2.rectangle(img_rgb, (x, y), (x + w, y + h), (0, 255, 0), 3)
-                        label = f"{emotion.upper()} ({conf * 100:.0f}%)"
-                        cv2.putText(img_rgb, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-                        st.write(f"**Result:** {label}")
-                        st.progress(float(conf))
-                    st.image(img_rgb, caption="Processed", use_container_width=True)
+
+                        # Draw Box & Text
+                        color = (0, 255, 0)  # Green
+                        cv2.rectangle(processed_img, (x, y), (x + w, y + h), color, 2)
+
+                        # Label Background for readability
+                        label = f"{emotion.upper()} ({int(conf * 100)}%)"
+                        (text_w, text_h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                        cv2.rectangle(processed_img, (x, y - 20), (x + text_w, y), color, -1)
+                        cv2.putText(processed_img, label, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+
+                    # Show Result in Col 2
+                    with col2:
+                        st.markdown("### Processed")
+                        st.image(processed_img, use_container_width=True)
+                        st.success(f"Detected: **{emotion.upper()}**")
+
+                else:
+                    with col2:
+                        st.warning("No faces detected.")
 
 # --- PAGE 3: HISTORY ---
 elif app_mode == "📂 Session History":
