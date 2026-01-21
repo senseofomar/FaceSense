@@ -19,19 +19,3 @@ def detect_faces(frame):
         minSize=(70, 70)
     )
 
-"""
-Parameter - minNeighbors 
-What it controls - "Quality Check. 
-How many times the algorithm must confirm "
-"Yes, this is a face"" before showing it."
-
-"If you see ""Ghost Faces"" (False Positives)",
-If it ignores Real Faces (False Negatives)
-"Increase (e.g., 5 → 6 → 7)","Decrease (e.g., 7 → 5)"
-
-Parameter - minSize
-What it controls - Size Filter. The smallest box allowed.,
-
-"Increase (e.g., (80,80) → (100,100))",
-"Decrease (e.g., (100,100) → (60,60))"
-"""
