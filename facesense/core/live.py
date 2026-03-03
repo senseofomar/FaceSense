@@ -54,9 +54,7 @@ def draw_hud(frame, x, y, w, h, color, scan_line_pos, emotion, confidence):
     cv2.line(frame, (x + w, y + h), (x + w - len_line, y + h), color, thick)
     cv2.line(frame, (x + w, y + h), (x + w, y + h - len_line), color, thick)
 
-    # 2. Scanning Laser Line
-    scan_y = y + int(scan_line_pos * h)
-    cv2.line(frame, (x, scan_y), (x + w, scan_y), (0, 255, 0), 2)
+
 
     # 3. CONFIDENCE BAR
     bar_x = x
