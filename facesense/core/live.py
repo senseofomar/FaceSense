@@ -15,23 +15,24 @@ COLOR_GRAY = (100, 100, 100)
 
 COLORS = {
     'angry': COLOR_RED,
-    'happy': (0, 255, 255),  # Yellow
-    'sad': (255, 0, 0),  # Blue
+    'happy': (0, 255, 255),   # Yellow
+    'sad': (255, 0, 0),        # Blue
     'neutral': COLOR_GREEN,
     'surprise': COLOR_CYAN,
-    'fear': (128, 0, 128),  # Purple
-    'disgust': (0, 128, 0)  # Dark Green
+    'fear': (128, 0, 128),     # Purple
+    'disgust': (0, 128, 0)     # Dark Green
 }
 
 EMOTION_EMOJI = {
-    'happy':   '😄',
-    'sad':     '😢',
-    'angry':   '😠',
-    'surprise':'😲',
-    'fear':    '😨',
-    'disgust': '🤢',
-    'neutral': '😐',
+    'happy':    '😄',
+    'sad':      '😢',
+    'angry':    '😠',
+    'surprise': '😲',
+    'fear':     '😨',
+    'disgust':  '🤢',
+    'neutral':  '😐',
 }
+
 
 def init_camera():
     cap = cv2.VideoCapture(1)
@@ -75,7 +76,7 @@ def draw_hud(frame, x, y, w, h, color, scan_line_pos, emotion, confidence):
     fill_width = int(w * confidence)
     cv2.rectangle(frame, (bar_x, bar_y), (bar_x + fill_width, bar_y + bar_h), color, -1)
 
-    # 4. Decorators (Removed Center Dot)
+    # 4. Decorators
     cv2.putText(frame, f"ID: 0x{id(x) % 1000:03X}", (x + w + 5, y + 20),
                 cv2.FONT_HERSHEY_PLAIN, 1, color, 1)
     cv2.putText(frame, f"CNF: {int(confidence * 100)}%", (x + w + 5, y + 40),
@@ -84,14 +85,13 @@ def draw_hud(frame, x, y, w, h, color, scan_line_pos, emotion, confidence):
 
 def draw_system_stats(frame, fps, is_recording, frame_count):
     """Draws FPS and Recording Status (Fixed Spacing)"""
-    # Background box - Tightened height (100 -> 90) to look cleaner
+    # --- CHANGE 3: FPS counter displayed in HUD box ---
     cv2.rectangle(frame, (10, 10), (220, 90), (0, 0, 0), -1)
     cv2.rectangle(frame, (10, 10), (220, 90), (0, 255, 0), 1)
 
     font = cv2.FONT_HERSHEY_PLAIN
     scale = 1.1
 
-    # Fixed Spacing: 35, 55, 75 (Exactly 20px gap each)
     cv2.putText(frame, "SYSTEM: ONLINE", (20, 35), font, scale, (0, 255, 0), 1)
     cv2.putText(frame, f"FPS: {int(fps)}", (20, 55), font, scale, (0, 255, 255), 1)
 
@@ -168,12 +168,10 @@ def main():
 
             # --- DRAWING LOGIC ---
             hud_color = COLORS.get(current_stable_emotion, COLOR_GREEN)
-
-            # Removed White Flash Logic - Just use the Emotion Color
             draw_hud(frame, x, y, w, h, hud_color, scan_pos, current_stable_emotion, current_confidence)
 
-            # Label
-            label = f"{EMOTION_EMOJI.get(emotion, '')} {emotion.upper()} ({confidence*100:.0f}%)"
+            emoji = EMOTION_EMOJI.get(current_stable_emotion, '')
+            label = f"{emoji} {current_stable_emotion.upper()} ({current_confidence * 100:.0f}%)"
             (text_w, text_h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)
 
             cv2.rectangle(frame, (x, y - 35), (x + text_w + 10, y), hud_color, -1)
