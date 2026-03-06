@@ -23,6 +23,15 @@ COLORS = {
     'disgust': (0, 128, 0)  # Dark Green
 }
 
+EMOTION_EMOJI = {
+    'happy':   '😄',
+    'sad':     '😢',
+    'angry':   '😠',
+    'surprise':'😲',
+    'fear':    '😨',
+    'disgust': '🤢',
+    'neutral': '😐',
+}
 
 def init_camera():
     cap = cv2.VideoCapture(1)
@@ -164,7 +173,7 @@ def main():
             draw_hud(frame, x, y, w, h, hud_color, scan_pos, current_stable_emotion, current_confidence)
 
             # Label
-            label = f"{current_stable_emotion.upper()}"
+            label = f"{EMOTION_EMOJI.get(emotion, '')} {emotion.upper()} ({confidence*100:.0f}%)"
             (text_w, text_h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)
 
             cv2.rectangle(frame, (x, y - 35), (x + text_w + 10, y), hud_color, -1)
