@@ -1,12 +1,17 @@
+import os
 import MySQLdb
-import datetime
-
 
 def get_connection():
-    return MySQLdb.connect(host="localhost", user="root", passwd="facesense", db="facesense", port=3306)
+    return MySQLdb.connect(
+        host=os.getenv("DB_HOST", "localhost"),
+        user=os.getenv("DB_USER", "root"),
+        passwd=os.getenv("DB_PASS", "facesense"),
+        db=os.getenv("DB_NAME", "facesense"),
+        port=int(os.getenv("DB_PORT", "3306"))
+    )
 
 
-# --- NEW: Session Management ---
+# --- Session Management ---
 def create_session(name):
     conn = get_connection()
     cursor = conn.cursor()
@@ -38,7 +43,7 @@ def get_active_session():
     return row  # Returns (id, name) or None
 
 
-# --- UPDATED: Logging ---
+# --- Logging ---
 def log_emotion(expression, confidence, bbox, session_ref_id=None):
     try:
         conn = get_connection()
@@ -53,7 +58,7 @@ def log_emotion(expression, confidence, bbox, session_ref_id=None):
 
         query = """
                 INSERT INTO emotion_logs (expression, confidence, x1, y1, x2, y2, session_ref_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s) \
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """
         cursor.execute(query, (expression, confidence, x1, y1, x2, y2, session_ref_id))
         conn.commit()
