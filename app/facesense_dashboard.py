@@ -50,6 +50,17 @@ SNAPSHOT_PATH = os.path.join(os.getcwd(), "snapshots", "last_frame.jpg")
 
 apply_custom_css()
 
+# --- CHANGE 4: Gradient Hero Banner ---
+st.markdown("""
+    <div style='text-align:center; padding: 14px;
+    background: linear-gradient(90deg, #1a1a2e, #16213e, #0f3460);
+    border-radius: 12px; margin-bottom: 24px;
+    border: 1px solid #e94560;'>
+        <h1 style='color:#e94560; margin:0; font-size:2.2rem;'>🧠 FaceSense AI</h1>
+        <p style='color:#aaa; margin:4px 0 0 0; font-size:1rem;'>Real-Time Emotion Recognition System</p>
+    </div>
+""", unsafe_allow_html=True)
+
 # --- HELPER FUNCTIONS ---
 
 # Global variable to store the last successful frame
@@ -145,7 +156,6 @@ if app_mode == "📡 Live Monitor":
                     last = df.iloc[-1]
 
                     with metrics_spot.container():
-                        # Stack metrics vertically to save width in the narrower column
                         m1, m2 = st.columns(2)
                         m1.metric("Emotion", last['expression'].upper())
                         m2.metric("Confidence", f"{float(last['confidence']) * 100:.1f}%")
@@ -154,7 +164,7 @@ if app_mode == "📡 Live Monitor":
                         x=alt.X('ts:T', title='Time', axis=alt.Axis(format='%H:%M:%S')),
                         y=alt.Y('expression:N', title='Emotion'),
                         color=alt.Color('expression:N', scale={"scheme": "category10"}),
-                    ).properties(height=250, title="Emotion Timeline")  # Reduced chart height slightly
+                    ).properties(height=250, title="Emotion Timeline")
                     chart_spot.altair_chart(chart, use_container_width=True)
                 else:
                     metrics_spot.info("Waiting for first detection...")
@@ -177,57 +187,44 @@ elif app_mode == "🖼️ Static Forensics":
         img_bgr = cv2.imdecode(file_bytes, 1)
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 
-
-        # --- PREPARE DISPLAY VERSIONS ---
-        # We process the FULL SIZE image for accuracy,
-        # but we display a RESIZED version for UI compactness.
-
-        def resize_for_display(img, max_h=300):  # Increased slightly to 300 for clarity
+        def resize_for_display(img, max_h=300):
             h, w = img.shape[:2]
             if h > max_h:
                 scale = max_h / h
                 return cv2.resize(img, (int(w * scale), max_h))
             return img
 
-
-        # Show Original (Resized for Display Only)
         col1, col2 = st.columns([1, 1])
         with col1:
             st.markdown("### Original")
             st.image(resize_for_display(img_rgb), use_container_width=False)
 
-        # Analyze Button
         analyze_clicked = st.button("🔍 Analyze Expression", type="primary", use_container_width=True)
 
         if analyze_clicked:
             with st.spinner("Processing High-Res Image..."):
                 from facesense.core.emotion import analyze_emotion
 
-                # 1. DETECT on the ORIGINAL HUGE IMAGE (High Accuracy)
                 faces = detect_faces(img_bgr)
                 processed_img = img_rgb.copy()
 
                 if len(faces) > 0:
                     for (x, y, w, h) in faces:
-                        # Extract from original high-res image
                         face_roi = img_bgr[y:y + h, x:x + w]
                         emotion, conf = analyze_emotion(face_roi)
 
-                        # Draw on original high-res image
                         color = (0, 255, 0)
-                        cv2.rectangle(processed_img, (x, y), (x + w, y + h), color, 4)  # Thicker line for high-res
+                        cv2.rectangle(processed_img, (x, y), (x + w, y + h), color, 4)
 
                         label = f"{emotion.upper()}"
-                        # Scale font size based on image width so it's readable on big images
                         font_scale = max(0.8, processed_img.shape[1] / 1000.0)
                         thickness = max(2, int(font_scale * 2))
 
                         (text_w, text_h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
                         cv2.rectangle(processed_img, (x, y - int(text_h * 1.5)), (x + text_w, y), color, -1)
-                        cv2.putText(processed_img, label, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0),
-                                    thickness)
+                        cv2.putText(processed_img, label, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, font_scale,
+                                    (0, 0, 0), thickness)
 
-                    # 2. RESIZE the FINAL RESULT for Display
                     with col2:
                         st.markdown("### Processed")
                         st.image(resize_for_display(processed_img), use_container_width=False)
@@ -271,19 +268,41 @@ elif app_mode == "📂 Session History":
                     csv = history_df.to_csv(index=False).encode('utf-8')
                     st.download_button("📥 Download CSV", csv, f"session_{selected_id}.csv", "text/csv")
 
-                    st.markdown("### 📈 Emotion Timeline")
-                    history_chart = alt.Chart(history_df).mark_tick(thickness=3).encode(
-                        x=alt.X('ts:T', title='Time'),
-                        y=alt.Y('expression:N', title='Emotion'),
-                        color=alt.Color('expression:N', scale={"scheme": "category10"})
-                    ).properties(height=350).interactive()
-                    st.altair_chart(history_chart, use_container_width=True)
-                    with st.expander("View Logs"):
+                    # --- CHANGE 2: Donut Chart + Timeline side by side ---
+                    st.markdown("### 📊 Emotion Breakdown")
+                    donut_col, timeline_col = st.columns([1, 2])
+
+                    with donut_col:
+                        emotion_counts = history_df['expression'].value_counts().reset_index()
+                        emotion_counts.columns = ['emotion', 'count']
+
+                        donut = alt.Chart(emotion_counts).mark_arc(innerRadius=55).encode(
+                            theta=alt.Theta(field="count", type="quantitative"),
+                            color=alt.Color(
+                                field="emotion",
+                                type="nominal",
+                                scale={"scheme": "category10"},
+                                legend=alt.Legend(title="Emotion")
+                            ),
+                            tooltip=["emotion", "count"]
+                        ).properties(title="Emotion Distribution", width=220, height=220)
+                        st.altair_chart(donut, use_container_width=True)
+
+                    with timeline_col:
+                        st.markdown("### 📈 Emotion Timeline")
+                        history_chart = alt.Chart(history_df).mark_tick(thickness=3).encode(
+                            x=alt.X('ts:T', title='Time'),
+                            y=alt.Y('expression:N', title='Emotion'),
+                            color=alt.Color('expression:N', scale={"scheme": "category10"})
+                        ).properties(height=220).interactive()
+                        st.altair_chart(history_chart, use_container_width=True)
+
+                    with st.expander("View Raw Logs"):
                         st.dataframe(history_df)
                 else:
                     st.warning("No data found.")
-            else:
-                st.info("No sessions found.")
-            conn.close()
+        else:
+            st.info("No sessions found.")
+        conn.close()
     except Exception as e:
         st.error(f"Database Error: {e}")
