@@ -41,7 +41,7 @@ EMOTION_PREFIX = {
 #   3 → snappy, can flicker a little
 #   5 → balanced (recommended)
 #   7 → very stable, hard to trigger subtle emotions like sad/fear
-VOTE_BUFFER_SIZE = 5
+VOTE_BUFFER_SIZE = 7
 
 # Run DeepFace every N frames (DeepFace is slow — don't call every frame)
 #   3 → more responsive, needs good GPU/CPU

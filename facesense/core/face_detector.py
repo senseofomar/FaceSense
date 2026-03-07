@@ -8,15 +8,12 @@ _face_cascade = cv2.CascadeClassifier(str(CASCADE_PATH))
 def detect_faces(frame):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    # Histogram equalisation → makes detection robust to dim/bright rooms
-    gray = cv2.equalizeHist(gray)
-
     return _face_cascade.detectMultiScale(
         gray,
         scaleFactor=1.1,
-        minNeighbors=7,   # was 4 → raised to 7: kills flickering & ghost faces
+        minNeighbors=5,   # was 4 → raised to 5: kills flickering & ghost faces
                           # If your face stops being detected, lower to 6 or 5
-        minSize=(90, 90)  # was 70 → raised: ignores far-away/partial detections
+        minSize=(80, 80)  # was 70 → raised: ignores far-away/partial detections
     )
 
 """
