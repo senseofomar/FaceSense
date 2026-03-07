@@ -59,4 +59,4 @@ def run_on_image(image_path, show = True, log_to_db=True):
         cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    run_on_image("facesense/storage/raw/gg.png")
+    run_on_image("facesense/storage/raw/sallu.jpeg")
