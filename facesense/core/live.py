@@ -6,31 +6,35 @@ from facesense.core.emotion import analyze_emotion
 from facesense.snapshots.snapshot import save_snapshot
 from facesense.storage.db import log_emotion, get_active_session
 
-# --- CONFIG ---
-COLOR_CYAN = (255, 255, 0)
-COLOR_GREEN = (0, 255, 0)
-COLOR_RED = (0, 0, 255)
-COLOR_WHITE = (255, 255, 255)
-COLOR_GRAY = (100, 100, 100)
+# ── CONFIG ──────────────────────────────────────────────────────────────────
+COLOR_GREEN  = (0, 255, 0)       # neutral   → #00FF00
+COLOR_YELLOW = (0, 220, 255)     # happy     → #FFDC00
+COLOR_RED    = (0, 0, 220)       # angry     → #DC0000
+COLOR_BLUE   = (220, 100, 50)    # sad       → #3264DC
+COLOR_CYAN   = (255, 200, 0)     # surprise  → #00C8FF
+COLOR_PURPLE = (180, 0, 180)     # fear      → #B400B4
+COLOR_DKGRN  = (0, 140, 0)      # disgust   → #008C00
+COLOR_GRAY   = (100, 100, 100)
 
 COLORS = {
-    'angry': COLOR_RED,
-    'happy': (0, 255, 255),   # Yellow
-    'sad': (255, 0, 0),        # Blue
-    'neutral': COLOR_GREEN,
+    'neutral':  COLOR_GREEN,
+    'happy':    COLOR_YELLOW,
+    'angry':    COLOR_RED,
+    'sad':      COLOR_BLUE,
     'surprise': COLOR_CYAN,
-    'fear': (128, 0, 128),     # Purple
-    'disgust': (0, 128, 0)     # Dark Green
+    'fear':     COLOR_PURPLE,
+    'disgust':  COLOR_DKGRN,
 }
 
-EMOTION_EMOJI = {
-    'happy':    '😄',
-    'sad':      '😢',
-    'angry':    '😠',
-    'surprise': '😲',
-    'fear':     '😨',
-    'disgust':  '🤢',
-    'neutral':  '😐',
+# ASCII prefixes — no Unicode, OpenCV can't render emoji
+EMOTION_PREFIX = {
+    'happy':    '[HAPPY]',
+    'sad':      '[SAD]',
+    'angry':    '[ANGRY]',
+    'surprise': '[SURPRISE]',
+    'fear':     '[FEAR]',
+    'disgust':  '[DISGUST]',
+    'neutral':  '[NEUTRAL]',
 }
 
 
@@ -44,151 +48,154 @@ def init_camera():
 
 
 def get_dominant_emotion(buffer):
-    if not buffer: return "neutral"
+    if not buffer:
+        return "neutral"
     return max(set(buffer), key=buffer.count)
 
 
 def draw_hud(frame, x, y, w, h, color, scan_line_pos, emotion, confidence):
-    """Draws Sci-Fi HUD + Confidence Bar (CLEAN VERSION)"""
+    """Draws Sci-Fi HUD corner brackets, scan line, and confidence bar."""
 
     # 1. Corner Brackets
-    len_line = int(w * 0.15)
+    ll = int(w * 0.18)
     thick = 2
-
-    cv2.line(frame, (x, y), (x + len_line, y), color, thick)
-    cv2.line(frame, (x, y), (x, y + len_line), color, thick)
-    cv2.line(frame, (x + w, y), (x + w - len_line, y), color, thick)
-    cv2.line(frame, (x + w, y), (x + w, y + len_line), color, thick)
-    cv2.line(frame, (x, y + h), (x + len_line, y + h), color, thick)
-    cv2.line(frame, (x, y + h), (x, y + h - len_line), color, thick)
-    cv2.line(frame, (x + w, y + h), (x + w - len_line, y + h), color, thick)
-    cv2.line(frame, (x + w, y + h), (x + w, y + h - len_line), color, thick)
+    cv2.line(frame, (x,     y),     (x + ll, y),     color, thick)
+    cv2.line(frame, (x,     y),     (x,      y + ll), color, thick)
+    cv2.line(frame, (x + w, y),     (x + w - ll, y), color, thick)
+    cv2.line(frame, (x + w, y),     (x + w, y + ll), color, thick)
+    cv2.line(frame, (x,     y + h), (x + ll, y + h), color, thick)
+    cv2.line(frame, (x,     y + h), (x,      y + h - ll), color, thick)
+    cv2.line(frame, (x + w, y + h), (x + w - ll, y + h), color, thick)
+    cv2.line(frame, (x + w, y + h), (x + w,  y + h - ll), color, thick)
 
     # 2. Scanning Laser Line
     scan_y = y + int(scan_line_pos * h)
-    cv2.line(frame, (x, scan_y), (x + w, scan_y), (0, 255, 0), 2)
+    cv2.line(frame, (x, scan_y), (x + w, scan_y), color, 1)
 
-    # 3. CONFIDENCE BAR
-    bar_x = x
-    bar_y = y - 15
+    # 3. Confidence Bar (sits just above the top bracket)
+    bar_y = y - 12
     bar_h = 5
-    cv2.rectangle(frame, (bar_x, bar_y), (bar_x + w, bar_y + bar_h), (50, 50, 50), -1)
-    fill_width = int(w * confidence)
-    cv2.rectangle(frame, (bar_x, bar_y), (bar_x + fill_width, bar_y + bar_h), color, -1)
+    cv2.rectangle(frame, (x, bar_y), (x + w, bar_y + bar_h), (40, 40, 40), -1)
+    fill_w = int(w * confidence)
+    cv2.rectangle(frame, (x, bar_y), (x + fill_w, bar_y + bar_h), color, -1)
 
-    # 4. Decorators
-    cv2.putText(frame, f"ID: 0x{id(x) % 1000:03X}", (x + w + 5, y + 20),
-                cv2.FONT_HERSHEY_PLAIN, 1, color, 1)
-    cv2.putText(frame, f"CNF: {int(confidence * 100)}%", (x + w + 5, y + 40),
-                cv2.FONT_HERSHEY_PLAIN, 1, color, 1)
+    # 4. Side decorators
+    cv2.putText(frame, f"CNF:{int(confidence * 100)}%",
+                (x + w + 5, y + 20), cv2.FONT_HERSHEY_PLAIN, 1.0, color, 1)
+
+
+def draw_label(frame, x, y, emotion, confidence, color):
+    """Draws the emotion label tag above the face box. No emoji — plain ASCII only."""
+    prefix = EMOTION_PREFIX.get(emotion, '')
+    label  = f"{prefix} {int(confidence * 100)}%"
+
+    font       = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.75
+    thickness  = 2
+
+    (tw, th), baseline = cv2.getTextSize(label, font, font_scale, thickness)
+    tag_x1 = x
+    tag_y1 = y - th - 14
+    tag_x2 = x + tw + 12
+    tag_y2 = y - 2
+
+    # Filled background, thin border, black text
+    cv2.rectangle(frame, (tag_x1, tag_y1), (tag_x2, tag_y2), color, -1)
+    cv2.rectangle(frame, (tag_x1, tag_y1), (tag_x2, tag_y2), (0, 0, 0), 1)
+    cv2.putText(frame, label, (tag_x1 + 6, tag_y2 - 5), font, font_scale, (0, 0, 0), thickness)
 
 
 def draw_system_stats(frame, fps, is_recording, frame_count):
-    """Draws FPS and Recording Status (Fixed Spacing)"""
-    # --- CHANGE 3: FPS counter displayed in HUD box ---
-    cv2.rectangle(frame, (10, 10), (220, 90), (0, 0, 0), -1)
-    cv2.rectangle(frame, (10, 10), (220, 90), (0, 255, 0), 1)
+    """Draws the top-left system HUD box."""
+    cv2.rectangle(frame, (10, 10), (190, 85), (0, 0, 0), -1)
+    cv2.rectangle(frame, (10, 10), (190, 85), COLOR_GREEN, 1)
 
-    font = cv2.FONT_HERSHEY_PLAIN
-    scale = 1.1
+    font  = cv2.FONT_HERSHEY_PLAIN
+    scale = 1.05
 
-    cv2.putText(frame, "SYSTEM: ONLINE", (20, 35), font, scale, (0, 255, 0), 1)
-    cv2.putText(frame, f"FPS: {int(fps)}", (20, 55), font, scale, (0, 255, 255), 1)
+    cv2.putText(frame, "SYSTEM: ONLINE", (20, 32),  font, scale, COLOR_GREEN,  1)
+    cv2.putText(frame, f"FPS:    {int(fps)}", (20, 52), font, scale, (0, 220, 255), 1)
 
-    # DYNAMIC LOGGING STATUS
     if is_recording:
-        if frame_count % 30 < 15:  # Blink
-            cv2.circle(frame, (28, 70), 5, COLOR_RED, -1)
-            cv2.putText(frame, "LOGS: ACTIVE", (40, 75), font, scale, COLOR_RED, 1)
+        if frame_count % 30 < 15:
+            cv2.circle(frame, (25, 68), 5, COLOR_RED, -1)
+            cv2.putText(frame, "LOGS: ACTIVE", (36, 72), font, scale, COLOR_RED,  1)
     else:
-        cv2.putText(frame, "LOGS: IDLE", (20, 75), font, scale, COLOR_GRAY, 1)
+        cv2.putText(frame, "LOGS: IDLE", (20, 72), font, scale, COLOR_GRAY, 1)
 
 
 def main():
     cap = init_camera()
-    frame_count = 0
+    frame_count   = 0
     emotion_window = deque(maxlen=7)
     current_stable_emotion = "neutral"
-    current_confidence = 0.0
+    current_confidence     = 0.0
 
-    # State Variables
-    scan_pos = 0.0
-    scan_direction = 0.05
-    prev_time = 0
+    scan_pos       = 0.0
+    scan_direction = 0.04
+    prev_time      = 0.0
     is_recording_active = False
 
-    print("🎥 Webcam started. Press 'q' to quit.")
+    print("FaceSense Live started. Press 'q' to quit.")
 
     while True:
         ret, frame = cap.read()
-        if not ret: break
+        if not ret:
+            break
 
         frame = cv2.flip(frame, 1)
         frame_count += 1
 
-        # Calculate FPS
         curr_time = time.time()
-        fps = 1 / (curr_time - prev_time) if prev_time > 0 else 0
+        fps = 1.0 / (curr_time - prev_time) if prev_time > 0 else 0.0
         prev_time = curr_time
 
-        # Update Scanner
         scan_pos += scan_direction
         if scan_pos >= 1.0 or scan_pos <= 0.0:
             scan_direction *= -1
 
         faces = detect_faces(frame)
 
-        # --- GHOST BUSTER LOGIC ---
+        # Ghost-buster: keep only the largest face
         if len(faces) > 0:
-            largest_face = max(faces, key=lambda rect: rect[2] * rect[3])
-            faces = [largest_face]
+            largest = max(faces, key=lambda r: r[2] * r[3])
+            faces = [largest]
 
         for (x, y, w, h) in faces:
             face_roi = frame[y:y + h, x:x + w]
 
-            # --- AI LOGIC ---
             if frame_count % 5 == 0:
                 if frame_count % 30 == 0:
                     session = get_active_session()
                     is_recording_active = (session is not None)
-
                 try:
                     raw, conf = analyze_emotion(face_roi)
                     emotion_window.append(raw)
                     current_stable_emotion = get_dominant_emotion(emotion_window)
-                    current_confidence = conf
-
+                    current_confidence     = conf
                     log_emotion(
                         expression=current_stable_emotion,
                         confidence=conf,
                         bbox=(x, y, x + w, y + h)
                     )
-                except:
+                except Exception:
                     pass
 
-            # --- DRAWING LOGIC ---
             hud_color = COLORS.get(current_stable_emotion, COLOR_GREEN)
-            draw_hud(frame, x, y, w, h, hud_color, scan_pos, current_stable_emotion, current_confidence)
-
-            emoji = EMOTION_EMOJI.get(current_stable_emotion, '')
-            label = f"{emoji} {current_stable_emotion.upper()} ({current_confidence * 100:.0f}%)"
-            (text_w, text_h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)
-
-            cv2.rectangle(frame, (x, y - 35), (x + text_w + 10, y), hud_color, -1)
-            cv2.putText(frame, label, (x + 5, y - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+            draw_hud(frame, x, y, w, h, hud_color, scan_pos,
+                     current_stable_emotion, current_confidence)
+            draw_label(frame, x, y, current_stable_emotion, current_confidence, hud_color)
 
         draw_system_stats(frame, fps, is_recording_active, frame_count)
-
         save_snapshot(frame)
-        cv2.imshow("FaceSense – Live (Mirror View)", frame)
+        cv2.imshow("FaceSense - Live", frame)
 
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
 
     cap.release()
     cv2.destroyAllWindows()
-    print("🛑 Webcam stopped.")
+    print("FaceSense stopped.")
 
 
 if __name__ == "__main__":
