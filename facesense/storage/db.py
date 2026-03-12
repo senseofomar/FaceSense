@@ -70,20 +70,20 @@ def get_active_session():
     return row   # (id, name)  or  None
 
 
-def get_session_video_path(session_id):
-    """Returns the video file path stored for a session, or None."""
+def set_session_video_path(session_id, video_path):
+    """Called by live.py once the video file is created, stores the path in DB."""
     try:
         conn   = get_connection()
         cursor = conn.cursor()
+        # Column already exists in DB — no need to ALTER TABLE here
         cursor.execute(
-            "SELECT video_path FROM sessions WHERE id = %s", (session_id,)
+            "UPDATE sessions SET video_path = %s WHERE id = %s",
+            (video_path, session_id)
         )
-        row = cursor.fetchone()
+        conn.commit()
         conn.close()
-        return row[0] if row else None
-    except Exception:
-        return None
-
+    except Exception as e:
+        print(f"DB WARNING (video path): {e}")
 
 # ── Emotion Logging ───────────────────────────────────────────────────────────
 
