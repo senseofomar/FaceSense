@@ -19,3 +19,8 @@ snapshots/*.png
 
 # Processed images
 facesense/storage/processed/
+
+# Recordings — video files are large, keep them local only
+recordings/*.avi
+recordings/*.mp4
+recordings/*.mov

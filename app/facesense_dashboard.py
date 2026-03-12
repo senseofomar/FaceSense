@@ -303,18 +303,21 @@ elif app_mode == "🖼️ Static Forensics":
                 else:
                     with col2:
                         st.warning("No faces detected.")
+
 # ════════════════════════════════════════════════════════════════════════════
-# PAGE 3 — SESSION HISTORY  (replace the existing elif block with this)
+# PAGE 3 — SESSION HISTORY  (replace existing block with this)
 # ════════════════════════════════════════════════════════════════════════════
 elif app_mode == "📂 Session History":
     st.markdown("## 📂 Session Analytics & Reports")
     st.markdown("<hr style='margin:0 0 16px 0'>", unsafe_allow_html=True)
 
+    # add this import at the top of the file:
+    # from facesense.storage.db import get_session_video_path
+
     try:
         conn     = get_connection()
         sessions = pd.read_sql(
-            "SELECT id, session_name, start_time, video_path FROM sessions ORDER BY id DESC",
-            conn
+            "SELECT id, session_name, start_time FROM sessions ORDER BY id DESC", conn
         )
 
         if not sessions.empty:
@@ -322,8 +325,7 @@ elif app_mode == "📂 Session History":
                 "Select a session to analyze:",
                 sessions["session_name"] + "  (ID: " + sessions["id"].astype(str) + ")"
             )
-            selected_id  = selected_name.split("ID: ")[1].replace(")", "").strip()
-            selected_row = sessions[sessions["id"] == int(selected_id)].iloc[0]
+            selected_id = selected_name.split("ID: ")[1].replace(")", "").strip()
 
             if st.button("Generate Report", type="primary"):
                 history_df = pd.read_sql(
@@ -340,12 +342,13 @@ elif app_mode == "📂 Session History":
                         (history_df["ts"].max() - history_df["ts"].min()).seconds
                         if len(history_df) > 1 else 0
                     )
-                    dom_color = EMOTION_COLORS.get(dominant, "#888")
+                    dom_color = emotion_metric_color(dominant)
 
                     m1, m2, m3 = st.columns(3, gap="medium")
                     m1.markdown(
                         f"""<div style='background:#1a1a1a;border:1px solid #2a2a2a;
-                            border-left:4px solid {dom_color};border-radius:10px;padding:14px 18px;'>
+                            border-left:4px solid {dom_color};border-radius:10px;
+                            padding:14px 18px;'>
                             <div style='font-size:.75rem;color:#888;text-transform:uppercase;
                                  letter-spacing:.05em;'>Dominant Emotion</div>
                             <div style='font-size:1.6rem;font-weight:800;color:{dom_color};'>
@@ -355,36 +358,31 @@ elif app_mode == "📂 Session History":
                     m2.metric("Avg Confidence", f"{avg_conf * 100:.1f}%")
                     m3.metric("Duration",       f"{duration}s")
 
-                    st.markdown("<div style='margin:12px 0 4px 0'></div>", unsafe_allow_html=True)
+                    st.markdown("<div style='margin:16px 0 4px 0'></div>",
+                                unsafe_allow_html=True)
 
-                    # ── Video playback ───────────────────────────────────────
-                    video_path = selected_row.get("video_path")
-                    if video_path and os.path.exists(str(video_path)):
+                    # ── Video player ─────────────────────────────────────────
+                    from facesense.storage.db import get_session_video_path
+                    video_path = get_session_video_path(selected_id)
+
+                    if video_path and os.path.exists(video_path):
                         st.markdown("#### 🎬 Session Recording")
-                        vid_col, dl_col = st.columns([3, 1], gap="medium")
+                        st.video(video_path)
 
-                        with vid_col:
-                            # Streamlit can play video directly from file bytes
-                            with open(video_path, "rb") as vf:
-                                video_bytes = vf.read()
-                            st.video(video_bytes)
-
-                        with dl_col:
-                            st.markdown("<div style='margin-top:28px'></div>",
-                                        unsafe_allow_html=True)
+                        # Download button for the video file
+                        with open(video_path, "rb") as vf:
                             st.download_button(
-                                label="⬇️ Download Video",
-                                data=video_bytes,
+                                label="📥 Download Video (.avi)",
+                                data=vf,
                                 file_name=os.path.basename(video_path),
                                 mime="video/x-msvideo"
                             )
-                            file_mb = os.path.getsize(video_path) / (1024 * 1024)
-                            st.caption(f"Size: {file_mb:.1f} MB")
                     else:
                         st.info("📹 No video recording found for this session. "
-                                "Recordings are saved for sessions started after this feature was added.")
+                                "Video recording starts automatically when you "
+                                "begin a new session while live.py is running.")
 
-                    st.markdown("<div style='margin-top:16px'></div>", unsafe_allow_html=True)
+                    st.markdown("---")
 
                     # ── CSV download ─────────────────────────────────────────
                     csv = history_df.to_csv(index=False).encode("utf-8")
@@ -394,13 +392,20 @@ elif app_mode == "📂 Session History":
                     )
 
                     # ── Charts ───────────────────────────────────────────────
-                    st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
+                    st.markdown("<div style='margin-top:20px'></div>",
+                                unsafe_allow_html=True)
                     donut_col, timeline_col = st.columns([5, 7], gap="large")
 
                     with donut_col:
                         st.markdown("#### Emotion Distribution")
-                        counts = history_df["expression"].value_counts().reset_index()
-                        counts.columns = ["emotion", "count"]
+                        counts = (
+                            history_df["expression"]
+                            .value_counts()
+                            .reset_index()
+                        )
+                        if "emotion" not in counts.columns:
+                            counts.columns = ["emotion", "count"]
+
                         donut = (
                             alt.Chart(counts)
                             .mark_arc(innerRadius=60, outerRadius=110)
@@ -409,8 +414,11 @@ elif app_mode == "📂 Session History":
                                 color=alt.Color(
                                     "emotion:N",
                                     scale=emotion_color_scale(),
-                                    legend=alt.Legend(title=None, orient="bottom",
-                                                      columns=2, labelFontSize=12)
+                                    legend=alt.Legend(
+                                        title=None, orient="bottom",
+                                        columns=2, labelFontSize=12,
+                                        symbolSize=120
+                                    )
                                 ),
                                 tooltip=["emotion:N", "count:Q"]
                             )
@@ -425,18 +433,24 @@ elif app_mode == "📂 Session History":
                             .mark_tick(thickness=3, size=20)
                             .encode(
                                 x=alt.X("ts:T", title="Time",
-                                        axis=alt.Axis(format="%H:%M:%S", labelAngle=-30)),
+                                        axis=alt.Axis(format="%H:%M:%S",
+                                                      labelAngle=-30)),
                                 y=alt.Y("expression:N", title=None,
                                         sort=list(EMOTION_COLORS.keys())),
                                 color=alt.Color(
                                     "expression:N",
                                     scale=emotion_color_scale(),
-                                    legend=alt.Legend(title=None, orient="bottom",
-                                                      columns=4, labelFontSize=12)
+                                    legend=alt.Legend(
+                                        title=None, orient="bottom",
+                                        columns=4, labelFontSize=12,
+                                        symbolSize=120
+                                    )
                                 ),
                                 tooltip=["expression:N",
-                                         alt.Tooltip("confidence:Q", format=".0%"),
-                                         alt.Tooltip("ts:T", format="%H:%M:%S")]
+                                         alt.Tooltip("confidence:Q",
+                                                     format=".0%"),
+                                         alt.Tooltip("ts:T",
+                                                     format="%H:%M:%S")]
                             )
                             .properties(height=260)
                             .interactive()
