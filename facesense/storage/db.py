@@ -18,7 +18,8 @@ def get_connection():
     )
 
 
-# --- Session Management ---
+# ── Session Management ────────────────────────────────────────────────────────
+
 def create_session(name):
     conn   = get_connection()
     cursor = conn.cursor()
@@ -28,6 +29,26 @@ def create_session(name):
     conn.commit()
     conn.close()
     return session_id
+
+
+def set_session_video_path(session_id, video_path):
+    """Called by live.py once the video file is created, stores the path in DB."""
+    try:
+        conn   = get_connection()
+        cursor = conn.cursor()
+        # Add video_path column if it doesn't exist yet (safe to run repeatedly)
+        cursor.execute("""
+            ALTER TABLE sessions
+            ADD COLUMN IF NOT EXISTS video_path VARCHAR(512) DEFAULT NULL
+        """)
+        cursor.execute(
+            "UPDATE sessions SET video_path = %s WHERE id = %s",
+            (video_path, session_id)
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"DB WARNING (video path): {e}")
 
 
 def end_active_session():
@@ -41,55 +62,45 @@ def end_active_session():
 def get_active_session():
     conn   = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, session_name FROM sessions WHERE is_active=1 ORDER BY id DESC LIMIT 1")
+    cursor.execute(
+        "SELECT id, session_name FROM sessions WHERE is_active=1 ORDER BY id DESC LIMIT 1"
+    )
     row = cursor.fetchone()
     conn.close()
-    return row  # (id, name) or None
+    return row   # (id, name)  or  None
 
 
-def save_video_path(session_id, video_path):
-    """Store the path of the recorded video against the session."""
+def get_session_video_path(session_id):
+    """Returns the video file path stored for a session, or None."""
     try:
         conn   = get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE sessions SET video_path = %s WHERE id = %s",
-            (video_path, session_id)
+            "SELECT video_path FROM sessions WHERE id = %s", (session_id,)
         )
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print("DB ERROR (save_video_path):", e)
-
-
-def get_session_video_path(session_id):
-    """Retrieve the video path for a given session id."""
-    try:
-        conn   = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT video_path FROM sessions WHERE id = %s", (session_id,))
         row = cursor.fetchone()
         conn.close()
         return row[0] if row else None
-    except Exception as e:
-        print("DB ERROR (get_session_video_path):", e)
+    except Exception:
         return None
 
 
-# --- Logging ---
+# ── Emotion Logging ───────────────────────────────────────────────────────────
+
 def log_emotion(expression, confidence, bbox, session_ref_id=None):
     try:
         conn   = get_connection()
         cursor = conn.cursor()
         x1, y1, x2, y2 = map(int, bbox)
-        confidence = float(confidence)
+        confidence      = float(confidence)
 
         if session_ref_id is None:
-            active = get_active_session()
+            active         = get_active_session()
             session_ref_id = active[0] if active else None
 
         cursor.execute(
-            """INSERT INTO emotion_logs (expression, confidence, x1, y1, x2, y2, session_ref_id)
+            """INSERT INTO emotion_logs
+               (expression, confidence, x1, y1, x2, y2, session_ref_id)
                VALUES (%s, %s, %s, %s, %s, %s, %s)""",
             (expression, confidence, x1, y1, x2, y2, session_ref_id)
         )
