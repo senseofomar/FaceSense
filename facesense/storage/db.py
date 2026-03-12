@@ -2,10 +2,8 @@ import os
 import MySQLdb
 import datetime
 from dotenv import load_dotenv
-
-# --- Load .env file from the project root ---
-# This finds .env wherever the project root is, regardless of where you run from
 from pathlib import Path
+
 env_path = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(dotenv_path=env_path)
 
@@ -22,11 +20,10 @@ def get_connection():
 
 # --- Session Management ---
 def create_session(name):
-    conn = get_connection()
+    conn   = get_connection()
     cursor = conn.cursor()
     cursor.execute("UPDATE sessions SET is_active=0 WHERE is_active=1")
-    query = "INSERT INTO sessions (session_name) VALUES (%s)"
-    cursor.execute(query, (name,))
+    cursor.execute("INSERT INTO sessions (session_name) VALUES (%s)", (name,))
     session_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -34,7 +31,7 @@ def create_session(name):
 
 
 def end_active_session():
-    conn = get_connection()
+    conn   = get_connection()
     cursor = conn.cursor()
     cursor.execute("UPDATE sessions SET is_active=0, end_time=NOW() WHERE is_active=1")
     conn.commit()
@@ -42,18 +39,47 @@ def end_active_session():
 
 
 def get_active_session():
-    conn = get_connection()
+    conn   = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id, session_name FROM sessions WHERE is_active=1 ORDER BY id DESC LIMIT 1")
     row = cursor.fetchone()
     conn.close()
-    return row
+    return row  # (id, name) or None
+
+
+def save_video_path(session_id, video_path):
+    """Store the path of the recorded video against the session."""
+    try:
+        conn   = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE sessions SET video_path = %s WHERE id = %s",
+            (video_path, session_id)
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print("DB ERROR (save_video_path):", e)
+
+
+def get_session_video_path(session_id):
+    """Retrieve the video path for a given session id."""
+    try:
+        conn   = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT video_path FROM sessions WHERE id = %s", (session_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return row[0] if row else None
+    except Exception as e:
+        print("DB ERROR (get_session_video_path):", e)
+        return None
 
 
 # --- Logging ---
 def log_emotion(expression, confidence, bbox, session_ref_id=None):
     try:
-        conn = get_connection()
+        conn   = get_connection()
         cursor = conn.cursor()
         x1, y1, x2, y2 = map(int, bbox)
         confidence = float(confidence)
@@ -62,11 +88,11 @@ def log_emotion(expression, confidence, bbox, session_ref_id=None):
             active = get_active_session()
             session_ref_id = active[0] if active else None
 
-        query = """
-                INSERT INTO emotion_logs (expression, confidence, x1, y1, x2, y2, session_ref_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """
-        cursor.execute(query, (expression, confidence, x1, y1, x2, y2, session_ref_id))
+        cursor.execute(
+            """INSERT INTO emotion_logs (expression, confidence, x1, y1, x2, y2, session_ref_id)
+               VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+            (expression, confidence, x1, y1, x2, y2, session_ref_id)
+        )
         conn.commit()
         conn.close()
     except Exception as e:
