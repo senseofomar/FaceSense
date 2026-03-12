@@ -36,11 +36,7 @@ def set_session_video_path(session_id, video_path):
     try:
         conn   = get_connection()
         cursor = conn.cursor()
-        # Add video_path column if it doesn't exist yet (safe to run repeatedly)
-        cursor.execute("""
-            ALTER TABLE sessions
-            ADD COLUMN IF NOT EXISTS video_path VARCHAR(512) DEFAULT NULL
-        """)
+        # Column already exists in DB — no need to ALTER TABLE here
         cursor.execute(
             "UPDATE sessions SET video_path = %s WHERE id = %s",
             (video_path, session_id)
@@ -70,20 +66,20 @@ def get_active_session():
     return row   # (id, name)  or  None
 
 
-def set_session_video_path(session_id, video_path):
-    """Called by live.py once the video file is created, stores the path in DB."""
+def get_session_video_path(session_id):
+    """Returns the video file path stored for a session, or None."""
     try:
         conn   = get_connection()
         cursor = conn.cursor()
-        # Column already exists in DB — no need to ALTER TABLE here
         cursor.execute(
-            "UPDATE sessions SET video_path = %s WHERE id = %s",
-            (video_path, session_id)
+            "SELECT video_path FROM sessions WHERE id = %s", (session_id,)
         )
-        conn.commit()
+        row = cursor.fetchone()
         conn.close()
-    except Exception as e:
-        print(f"DB WARNING (video path): {e}")
+        return row[0] if row else None
+    except Exception:
+        return None
+
 
 # ── Emotion Logging ───────────────────────────────────────────────────────────
 
