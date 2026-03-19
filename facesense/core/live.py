@@ -43,7 +43,7 @@ EMOTION_PREFIX = {
     'neutral':  '[NEUTRAL]',
 }
 
-VOTE_BUFFER_SIZE = 5
+VOTE_BUFFER_SIZE = 10
 AI_FRAME_SKIP    = 5
 
 # ── Recordings folder (project_root/recordings/) ──────────────────────────────

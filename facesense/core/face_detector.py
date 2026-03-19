@@ -11,9 +11,9 @@ def detect_faces(frame):
     return _face_cascade.detectMultiScale(
         gray,
         scaleFactor=1.1,
-        minNeighbors=5,   # was 4 → raised to 5: kills flickering & ghost faces
+        minNeighbors=4,   # was 4 → raised to 5: kills flickering & ghost faces
                           # If your face stops being detected, lower to 6 or 5
-        minSize=(77, 77)  # was 70 → raised: ignores far-away/partial detections
+        minSize=(70, 70)  # was 70 → raised: ignores far-away/partial detections
     )
 
 """
