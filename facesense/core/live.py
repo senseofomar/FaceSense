@@ -1,5 +1,4 @@
 import cv2
-import os
 import time
 from datetime import datetime
 from collections import deque
@@ -143,35 +142,52 @@ def get_dominant_emotion(buffer):
 
 
 def draw_hud(frame, x, y, w, h, color, scan_line_pos, confidence):
-    ll    = int(w * 0.18)
+    """Draws the clean Sci-Fi brackets and scanning line."""
+    ll = int(w * 0.15)  # Slightly shorter, sleeker corner brackets
     thick = 2
-    cv2.line(frame, (x,     y),     (x+ll,    y),       color, thick)
-    cv2.line(frame, (x,     y),     (x,        y+ll),   color, thick)
-    cv2.line(frame, (x+w,   y),     (x+w-ll,   y),      color, thick)
-    cv2.line(frame, (x+w,   y),     (x+w,      y+ll),   color, thick)
-    cv2.line(frame, (x,     y+h),   (x+ll,     y+h),    color, thick)
-    cv2.line(frame, (x,     y+h),   (x,         y+h-ll),color, thick)
-    cv2.line(frame, (x+w,   y+h),   (x+w-ll,   y+h),   color, thick)
-    cv2.line(frame, (x+w,   y+h),   (x+w,      y+h-ll),color, thick)
 
+    # Corner Brackets
+    cv2.line(frame, (x, y), (x + ll, y), color, thick)
+    cv2.line(frame, (x, y), (x, y + ll), color, thick)
+    cv2.line(frame, (x + w, y), (x + w - ll, y), color, thick)
+    cv2.line(frame, (x + w, y), (x + w, y + ll), color, thick)
+    cv2.line(frame, (x, y + h), (x + ll, y + h), color, thick)
+    cv2.line(frame, (x, y + h), (x, y + h - ll), color, thick)
+    cv2.line(frame, (x + w, y + h), (x + w - ll, y + h), color, thick)
+    cv2.line(frame, (x + w, y + h), (x + w, y + h - ll), color, thick)
+
+    # Scanning Laser Line
     scan_y = y + int(scan_line_pos * h)
-    cv2.line(frame, (x, scan_y), (x+w, scan_y), color, 1)
+    cv2.line(frame, (x, scan_y), (x + w, scan_y), color, 1)
 
-    bar_y = max(y - 12, 0)
-    cv2.rectangle(frame, (x, bar_y), (x+w,                bar_y+5), (40,40,40), -1)
-    cv2.rectangle(frame, (x, bar_y), (x+int(w*confidence), bar_y+5), color,     -1)
-    cv2.putText(frame, f"CNF:{int(confidence*100)}%",
-                (x+w+5, y+20), cv2.FONT_HERSHEY_PLAIN, 1.0, color, 1)
+    # Sleek Confidence Progress Bar (Positioned neatly above the box)
+    bar_y = max(y - 8, 0)
+    cv2.rectangle(frame, (x, bar_y), (x + w, bar_y + 3), (40, 40, 40), -1)  # Dark background track
+    cv2.rectangle(frame, (x, bar_y), (x + int(w * confidence), bar_y + 3), color, -1)  # Fill
 
 
 def draw_label(frame, x, y, emotion, confidence, color):
-    label = f"{EMOTION_PREFIX.get(emotion, emotion.upper())} {int(confidence*100)}%"
-    font, scale, thick = cv2.FONT_HERSHEY_SIMPLEX, 0.72, 2
+    """Draws a modern, flat-design emotion label."""
+    # Clean text formatting: e.g., "HAPPY • 70%"
+    clean_emotion = emotion.upper()
+    label = f"{clean_emotion} {int(confidence * 100)}%"
+
+    font = cv2.FONT_HERSHEY_DUPLEX  # Slightly more modern font than standard SIMPLEX
+    scale = 0.6
+    thick = 1
+
     (tw, th), _ = cv2.getTextSize(label, font, scale, thick)
-    y1 = max(y - th - 14, 0)
-    cv2.rectangle(frame, (x,    y1), (x+tw+12, y-2), color,     -1)
-    cv2.rectangle(frame, (x,    y1), (x+tw+12, y-2), (0,0,0),    1)
-    cv2.putText(frame,   label, (x+6, y-7), font, scale, (0,0,0), thick)
+
+    # Position box above the confidence bar
+    y_box_bottom = max(y - 12, 0)
+    y_box_top = max(y_box_bottom - th - 10, 0)
+
+    # Draw flat background color box (no harsh black outline)
+    cv2.rectangle(frame, (x, y_box_top), (x + tw + 10, y_box_bottom), color, -1)
+
+    # Text Color Logic: If the background is bright (Yellow/Cyan/Green), use Black text. If dark, use White.
+    # To keep it simple and readable for now, we'll stick to black text for high contrast.
+    cv2.putText(frame, label, (x + 5, y_box_bottom - 5), font, scale, (0, 0, 0), thick)
 
 
 def draw_system_stats(frame, fps, is_recording, frame_count):
