@@ -1,33 +1,35 @@
 @echo off
-REM Robust run_all.bat for Windows — put this in project root
+color 0a
+title FaceSense Bootloader
 
-REM Move to the folder where this script lives (project root)
-pushd "%~dp0" || (
-  echo Failed to change directory to "%~dp0"
-  pause
-  exit /b 1
-)
+echo =========================================
+echo       INITIALIZING FACESENSE AI
+echo =========================================
+echo.
 
-REM Check venv activation script exists
+REM Ensure we are in the correct directory (D:\PycharmProjects\FaceSense)
+cd /d "%~dp0"
+
+REM Check if virtual environment exists
 IF NOT EXIST ".venv\Scripts\activate" (
-  echo Virtualenv activation not found at .venv\Scripts\activate
-  echo Please create or point run_all.bat to your venv.
-  popd
+  color 0c
+  echo [ERROR] Virtual environment not found at .venv\Scripts\activate
   pause
   exit /b 1
 )
 
-echo Project root: %CD%
-echo Starting FaceSense Live and Streamlit Dashboard...
+echo [1/2] Booting AI Inference Engine (Camera)...
+REM Opens a new terminal, activates venv, and runs the camera module
+start "FaceSense Camera" cmd /k "call .venv\Scripts\activate && python -m facesense.core.live"
 
-REM Start FaceSense Live in a new window (no extra cd inside start)
-start "FaceSense Live" cmd /k ".venv\Scripts\activate && echo Running FaceSense Live... && python -u src\facesense_live.py"
+REM Wait 3 seconds to let the camera initialize before launching the dashboard
+timeout /t 3 /nobreak >nul
 
-REM short delay so the camera process starts first
-timeout /t 1 /nobreak >nul
+echo [2/2] Booting Analytics Dashboard...
+REM Opens a new terminal, activates venv, and runs the Streamlit app
+start "FaceSense Dashboard" cmd /k "call .venv\Scripts\activate && streamlit run app\facesense_dashboard.py"
 
-REM Start Streamlit Dashboard in a new window
-start "FaceSense Dashboard" cmd /k ".venv\Scripts\activate && echo Running Streamlit Dashboard... && streamlit run app\facesense_dashboard.py"
-
-popd
-exit /b 0
+echo.
+echo FaceSense components launched successfully!
+echo You can minimize or close this green window.
+pause
