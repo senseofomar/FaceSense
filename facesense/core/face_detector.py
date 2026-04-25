@@ -5,16 +5,7 @@ CASCADE_PATH  = Path(__file__).resolve().parents[1] / "assets" / "haarcascade_fr
 _face_cascade = cv2.CascadeClassifier(str(CASCADE_PATH))
 
 
-def detect_faces(frame):
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    return _face_cascade.detectMultiScale(
-        gray,
-        scaleFactor=1.1,
-        minNeighbors=4,   # was 4 → raised to 5: kills flickering & ghost faces
-                          # If your face stops being detected, lower to 6 or 5
-        minSize=(70, 70)  # was 70 → raised: ignores far-away/partial detections
-    )
 
 """
 TUNING GUIDE
