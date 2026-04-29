@@ -166,28 +166,7 @@ def draw_hud(frame, x, y, w, h, color, scan_line_pos, confidence):
     cv2.rectangle(frame, (x, bar_y), (x + int(w * confidence), bar_y + 3), color, -1)  # Fill
 
 
-def draw_label(frame, x, y, emotion, confidence, color):
-    """Draws a modern, flat-design emotion label."""
-    # Clean text formatting: e.g., "HAPPY • 70%"
-    clean_emotion = emotion.upper()
-    label = f"{clean_emotion} {int(confidence * 100)}%"
 
-    font = cv2.FONT_HERSHEY_DUPLEX  # Slightly more modern font than standard SIMPLEX
-    scale = 0.6
-    thick = 1
-
-    (tw, th), _ = cv2.getTextSize(label, font, scale, thick)
-
-    # Position box above the confidence bar
-    y_box_bottom = max(y - 12, 0)
-    y_box_top = max(y_box_bottom - th - 10, 0)
-
-    # Draw flat background color box (no harsh black outline)
-    cv2.rectangle(frame, (x, y_box_top), (x + tw + 10, y_box_bottom), color, -1)
-
-    # Text Color Logic: If the background is bright (Yellow/Cyan/Green), use Black text. If dark, use White.
-    # To keep it simple and readable for now, we'll stick to black text for high contrast.
-    cv2.putText(frame, label, (x + 5, y_box_bottom - 5), font, scale, (0, 0, 0), thick)
 
 
 def draw_system_stats(frame, fps, is_recording, frame_count):
