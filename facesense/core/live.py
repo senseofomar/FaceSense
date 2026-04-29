@@ -188,6 +188,19 @@ def draw_label(frame, x, y, emotion, confidence, color):
     # To keep it simple and readable for now, we'll stick to black text for high contrast.
     cv2.putText(frame, label, (x + 5, y_box_bottom - 5), font, scale, (0, 0, 0), thick)
 
+def draw_system_stats(frame, fps, is_recording, frame_count):
+    cv2.rectangle(frame, (10,10), (195,85), (0,0,0),   -1)
+    cv2.rectangle(frame, (10,10), (195,85), COLOR_GREEN, 1)
+    font, scale = cv2.FONT_HERSHEY_PLAIN, 1.05
+    cv2.putText(frame, "SYSTEM: ONLINE",      (20,32), font, scale, COLOR_GREEN,   1)
+    cv2.putText(frame, f"FPS:    {int(fps)}", (20,52), font, scale, (0,220,255),   1)
+    if is_recording:
+        if frame_count % 30 < 15:
+            cv2.circle(frame, (25,68), 5, COLOR_RED, -1)
+            cv2.putText(frame, "REC+LOG", (36,72), font, scale, COLOR_RED, 1)
+    else:
+        cv2.putText(frame, "LOGS: IDLE", (20,72), font, scale, COLOR_GRAY, 1)
+
 
 # ── MAIN LOOP ─────────────────────────────────────────────────────────────────
 
