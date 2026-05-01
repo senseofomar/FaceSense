@@ -135,10 +135,6 @@ def init_camera():
     return cap
 
 
-def get_dominant_emotion(buffer):
-    if not buffer:
-        return "neutral"
-    return max(set(buffer), key=buffer.count)
 
 
 def draw_hud(frame, x, y, w, h, color, scan_line_pos, confidence):
