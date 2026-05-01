@@ -204,7 +204,106 @@ def draw_system_stats(frame, fps, is_recording, frame_count):
 
 # ── MAIN LOOP ─────────────────────────────────────────────────────────────────
 
+def main():
+    cap      = init_camera()
+    recorder = VideoRecorder()
 
+    frame_count            = 0
+    emotion_window         = deque(maxlen=VOTE_BUFFER_SIZE)
+    current_stable_emotion = "neutral"
+    current_confidence     = 0.0
+    scan_pos               = 0.0
+    scan_direction         = 0.04
+    prev_time              = 0.0
+    active_session         = None   # cached (id, name)
+
+    last_face      = None
+    no_face_frames = 0
+    NO_FACE_TOL    = 8
+
+    print("FaceSense Live started. Press 'q' to quit.")
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        frame = cv2.flip(frame, 1)
+        frame_count += 1
+
+        curr_time = time.time()
+        fps       = 1.0 / (curr_time - prev_time) if prev_time > 0 else 0.0
+        prev_time = curr_time
+
+        scan_pos += scan_direction
+        if scan_pos >= 1.0 or scan_pos <= 0.0:
+            scan_direction *= -1
+
+        # ── Check session every 30 frames ────────────────────────────────────
+        if frame_count % 30 == 0:
+            active_session = get_active_session()
+            # Tell the recorder — it auto-starts/stops as needed
+            recorder.update(active_session, frame.shape)
+
+        is_recording_active = recorder.is_recording
+
+        # ── Face detection ────────────────────────────────────────────────────
+        raw_faces = detect_faces(frame)
+
+        if len(raw_faces) > 0:
+            best           = max(raw_faces, key=lambda r: r[2]*r[3])
+            last_face      = best
+            no_face_frames = 0
+            active_face    = best
+        elif no_face_frames < NO_FACE_TOL and last_face is not None:
+            no_face_frames += 1
+            active_face     = last_face
+        else:
+            active_face = None
+
+        # ── AI + drawing ──────────────────────────────────────────────────────
+        if active_face is None:
+            cv2.putText(frame, "Searching...", (20, frame.shape[0]-20),
+                        cv2.FONT_HERSHEY_PLAIN, 1.2, COLOR_GRAY, 1)
+        else:
+            x, y, w, h = active_face
+            face_roi    = frame[y:y+h, x:x+w]
+
+            if frame_count % AI_FRAME_SKIP == 0:
+                if face_roi.shape[0] >= 48 and face_roi.shape[1] >= 48:
+                    try:
+                        raw, conf = analyze_emotion(face_roi)
+                        emotion_window.append(raw)
+                        current_stable_emotion = get_dominant_emotion(emotion_window)
+                        current_confidence     = conf
+                        log_emotion(
+                            expression=current_stable_emotion,
+                            confidence=conf,
+                            bbox=(x, y, x+w, y+h)
+                        )
+                    except Exception:
+                        pass
+
+            hud_color = COLORS.get(current_stable_emotion, COLOR_GREEN)
+            draw_hud(frame, x, y, w, h, hud_color, scan_pos, current_confidence)
+            draw_label(frame, x, y, current_stable_emotion, current_confidence, hud_color)
+
+        draw_system_stats(frame, fps, is_recording_active, frame_count)
+
+        # ── Write annotated frame to video if recording ───────────────────────
+        recorder.write(frame)
+
+        save_snapshot(frame)
+        cv2.imshow("FaceSense - Live", frame)
+
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break
+
+    # Clean up — make sure video is finalised even if user presses q mid-session
+    recorder.update(None, (480, 640, 3))
+    cap.release()
+    cv2.destroyAllWindows()
+    print("FaceSense stopped.")
 
 
 if __name__ == "__main__":
