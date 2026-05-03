@@ -12,42 +12,6 @@ from facesense.storage.db import (
     set_session_video_path
 )
 
-# ── COLORS (BGR) ──────────────────────────────────────────────────────────────
-COLOR_GREEN  = (0, 255, 0)
-COLOR_YELLOW = (0, 220, 255)
-COLOR_RED    = (0, 0, 220)
-COLOR_BLUE   = (220, 100, 50)
-COLOR_CYAN   = (255, 200, 0)
-COLOR_PURPLE = (180, 0, 180)
-COLOR_DKGRN  = (0, 140, 0)
-COLOR_GRAY   = (100, 100, 100)
-
-COLORS = {
-    'neutral':  COLOR_GREEN,
-    'happy':    COLOR_YELLOW,
-    'angry':    COLOR_RED,
-    'sad':      COLOR_BLUE,
-    'surprise': COLOR_CYAN,
-    'fear':     COLOR_PURPLE,
-    'disgust':  COLOR_DKGRN,
-}
-
-EMOTION_PREFIX = {
-    'happy':    '[HAPPY]',
-    'sad':      '[SAD]',
-    'angry':    '[ANGRY]',
-    'surprise': '[SURPRISE]',
-    'fear':     '[FEAR]',
-    'disgust':  '[DISGUST]',
-    'neutral':  '[NEUTRAL]',
-}
-
-VOTE_BUFFER_SIZE = 10
-AI_FRAME_SKIP    = 5
-
-# ── Recordings folder (project_root/recordings/) ──────────────────────────────
-RECORDINGS_DIR = Path(__file__).resolve().parents[2] / "recordings"
-RECORDINGS_DIR.mkdir(exist_ok=True)   # create folder if it doesn't exist
 
 
 # ── VIDEO RECORDER ────────────────────────────────────────────────────────────
